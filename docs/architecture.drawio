@@ -1,0 +1,54 @@
+<mxfile host="65bd71144e">
+    <diagram id="zZiK7j1xIj4cQrgBoIcw" name="Page-1">
+        <mxGraphModel dx="3075" dy="3948" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="7" value="" style="html=1;dashed=0;whiteSpace=wrap;shape=mxgraph.dfd.start" vertex="1" parent="1">
+                    <mxGeometry x="-490" y="-330" width="2180" height="550" as="geometry"/>
+                </mxCell>
+                <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 36px;&quot; face=&quot;Verdana&quot;&gt;Web Application&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;font style=&quot;font-size: 36px;&quot; face=&quot;Verdana&quot;&gt;(React / Vite / TypeScript&lt;/font&gt;&lt;/div&gt;" treeRoot="1" id="3">
+                    <mxCell style="whiteSpace=wrap;html=1;align=center;treeFolding=1;treeMoving=1;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;};" vertex="1" parent="1">
+                        <mxGeometry x="-380" y="-190" width="490" height="270" as="geometry"/>
+                    </mxCell>
+                </UserObject>
+                <mxCell id="4" value="&lt;font&gt;Frontend&lt;/font&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Verdana;fontStyle=1;fontSize=56;" vertex="1" parent="1">
+                    <mxGeometry x="570" y="-290" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <UserObject label="&lt;font style=&quot;font-size: 36px;&quot; face=&quot;Verdana&quot;&gt;&lt;b style=&quot;&quot;&gt;Chat Interface&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 36px;&quot; face=&quot;Verdana&quot;&gt;(Ask questions, view responses, citations)&lt;/font&gt;&lt;/div&gt;" treeRoot="1" id="5">
+                    <mxCell style="whiteSpace=wrap;html=1;align=center;treeFolding=1;treeMoving=1;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;};" vertex="1" parent="1">
+                        <mxGeometry x="290" y="-195" width="540" height="280" as="geometry"/>
+                    </mxCell>
+                </UserObject>
+                <UserObject label="&lt;font style=&quot;font-size: 36px;&quot; face=&quot;Verdana&quot;&gt;&lt;b style=&quot;&quot;&gt;Document Management&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 36px;&quot; face=&quot;Verdana&quot;&gt;Upload/manage course materials&lt;/font&gt;&lt;/div&gt;" treeRoot="1" id="6">
+                    <mxCell style="whiteSpace=wrap;html=1;align=center;treeFolding=1;treeMoving=1;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;};" vertex="1" parent="1">
+                        <mxGeometry x="980" y="-185" width="625" height="260" as="geometry"/>
+                    </mxCell>
+                </UserObject>
+                <mxCell id="8" value="" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="-465" y="420" width="2130" height="740" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="&lt;b&gt;&lt;font style=&quot;font-size: 56px;&quot; face=&quot;Verdana&quot;&gt;Backend (FastAPI)&lt;/font&gt;&lt;/b&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=36;" vertex="1" parent="1">
+                    <mxGeometry x="300" y="460" width="600" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="" style="endArrow=classic;startArrow=classic;html=1;fontSize=24;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.5;entryDx=0;entryDy=275;entryPerimeter=0;" edge="1" parent="1" source="8" target="7">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="520" y="810" as="sourcePoint"/>
+                        <mxPoint x="590" y="280" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="12" value="&lt;font style=&quot;font-size: 36px;&quot;&gt;&lt;b&gt;HTTPS (REST/SSE)&lt;/b&gt;&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="11">
+                    <mxGeometry x="0.0745" y="3" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="13" value="&lt;font&gt;&lt;b&gt;API Layer&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;spacingTop=0;spacingBottom=300;fontSize=56;" vertex="1" parent="1">
+                    <mxGeometry x="-425" y="550" width="530" height="410" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-size: 36px;&quot;&gt;Routes&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-size: 36px;&quot;&gt;Request/Response Schemas&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-size: 36px;&quot;&gt;Authentication &amp;amp; Authorization&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-size: 36px;&quot;&gt;Streaming (SSE)&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-size: 36px;&quot;&gt;Error Handling&lt;/span&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="-440" y="670" width="535" height="240" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
