@@ -8,7 +8,7 @@ git clone https://github.com/vang838/StudySync.git
 ```
 
 ## Frontend Setup
-Built using Next.js, which handles what the user interacts with and views in the browser.
+Built Next.js bootstrapped with create-next-app.
 
 ### Prerequisites
 Before setting up the frontend, ensure you have:
