@@ -20,6 +20,11 @@ Before setting up the frontend, ensure you have:
 cd StudySync/frontend
 ```
 
+### 2. Install frontend dependencies
+```text
+npm ci
+```
+
 ### 3. Start the frontend dev server to test if it works properly
 ```text
 npm run dev
