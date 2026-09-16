@@ -54,3 +54,92 @@ When backend dependencies change, commit both `pyproject.toml` and `uv.lock`.
 After pulling changes that modify either dependency file, run: ```bash uv sync```
 
 Manual activation of python venv is not required when using `uv run`.
+
+## Database Setup
+StudySync stores its structured data in PostgreSQL.
+
+### Prerequisites
+Before setting up the database, ensure you have:
+- PostgreSQL 17 installed and running
+- `psql` available on your PATH
+
+### 1. Create the database
+```text
+createdb -U postgres studysync
+```
+
+### 2. Set the backend connection string
+```powershell
+$env:DATABASE_URL = 'postgresql+psycopg://postgres:<password>@localhost:5432/studysync'
+```
+
+### 3. Initialize the database schema
+```powershell
+cd backend
+$env:DATABASE_URL = 'postgresql+psycopg://postgres:<password>@localhost:5432/studysync'
+uv run python -c "from src.db.session import init_db; init_db()"
+```
+
+### 4. Start the backend against PostgreSQL
+```powershell
+$env:DATABASE_URL = 'postgresql+psycopg://postgres:<password>@localhost:5432/studysync'
+uv run python -m uvicorn src.main:app --reload
+```
+
+## System Architecture
+StudySync follows a simple browser-to-backend pattern.
+
+The frontend talks to FastAPI.
+
+FastAPI talks to PostgreSQL for structured data.
+
+The frontend never connects to PostgreSQL directly.
+
+If the backend needs any other service later, that stays behind FastAPI as well.
+
+## Communication Contract
+### Frontend to Backend
+- The frontend calls the FastAPI server over HTTP.
+- Standard reads and writes use REST endpoints that return JSON.
+- Long-running answer generation can use Server-Sent Events so the UI can stream updates.
+- The frontend should not embed backend secrets.
+
+### Backend to PostgreSQL
+- PostgreSQL is the system of record for users, courses, documents, chat sessions, message history, and citation records.
+- FastAPI performs all database access through backend code only.
+- The frontend receives API responses; it never reads PostgreSQL directly.
+
+## REST API Structure
+The API should stay versioned and resource-oriented under `/api/v1`.
+
+- `GET /api/v1/health` - service health check.
+- `POST /api/v1/auth/login` - sign in a user.
+- `POST /api/v1/auth/logout` - end a session.
+- `GET /api/v1/courses` - list the current user's courses.
+- `POST /api/v1/courses` - create a course.
+- `GET /api/v1/courses/{course_id}` - fetch course details.
+- `POST /api/v1/documents` - upload a document for ingestion.
+- `GET /api/v1/documents` - list uploaded documents.
+- `POST /api/v1/chat` - create a question, start answer generation, and return either a full response or an SSE stream.
+- `GET /api/v1/chat/{chat_id}` - fetch a chat thread and its messages.
+- `GET /api/v1/chat/{chat_id}/stream` - stream the answer as SSE tokens.
+- `GET /api/v1/sources/{source_id}` - fetch citation or source metadata.
+
+Request and response payloads should use Pydantic models so the frontend always receives a stable contract for validation errors, streaming status, citations, and answer content.
+
+## Environment Variables
+Use the backend settings and frontend API base URL that the app expects.
+
+| Variable | Scope | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | Frontend | Base URL for the FastAPI API, such as `http://localhost:8000`. |
+| `DATABASE_URL` | Backend | PostgreSQL connection string used by FastAPI. |
+| `CORS_ORIGINS` | Backend | Comma-separated list of allowed browser origins. |
+| `AI_PROVIDER` | Backend | Which model provider to use. |
+| `AI_API_KEY` | Backend | API key for the selected model provider. |
+| `AI_MODEL` | Backend | Chat/completion model name used for answers. |
+| `EMBEDDING_MODEL` | Backend | Embedding model used during document ingestion. |
+| `JWT_SECRET` | Backend | Signs authentication tokens or sessions if auth is enabled. |
+| `APP_ENV` | Backend | Runtime mode, such as development, staging, or production. |
+
+Pinecone is intentionally omitted here.
