@@ -11,20 +11,18 @@ from sqlalchemy.orm import Session, selectinload
 from src.db.models import ChatMessageRecord, ChatThreadRecord
 from src.db.session import get_db
 from src.schemas.contracts import ChatCreateRequest, ChatCreateResponse, ChatMessage, ChatThread
+from src.api.dependencies import get_chat_service
+from src.application.chat_service import ChatService
+from src.ports.llm import (
+    LLMResponseError,
+    LLMUnavailableError,
+)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _build_answer(course_id: str, question: str) -> str:
-    return (
-        f"I do not have course content connected yet, but I received your question for course "
-        f"'{course_id}': {question}"
-    )
-
 
 def _thread_to_schema(thread: ChatThreadRecord) -> ChatThread:
     return ChatThread(
@@ -42,10 +40,19 @@ def _thread_to_schema(thread: ChatThreadRecord) -> ChatThread:
 
 
 @router.post("", response_model=ChatCreateResponse, status_code=status.HTTP_201_CREATED)
-def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db)) -> ChatCreateResponse:
+def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db), chat_service: ChatService = Depends(get_chat_service),) -> ChatCreateResponse:
+    try:
+        answer = chat_service.generate_ans(question=payload.question)
+
+    except LLMUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="AI inference service is unavailable.",) from exc
+
+    except LLMResponseError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI inference returned an error")
+
     now = _utcnow()
     chat_id = uuid4().hex
-    answer = _build_answer(payload.course_id, payload.question)
+
     thread = ChatThreadRecord(
         chat_id=chat_id,
         course_id=payload.course_id,
@@ -53,16 +60,24 @@ def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db)) -> Ch
         answer=answer,
         created_at=now,
         updated_at=now,
-        messages=[
-            ChatMessageRecord(role="user", content=payload.question, created_at=now),
-            ChatMessageRecord(role="assistant", content=answer, created_at=now),
+        messages = [
+            ChatMessageRecord(
+                role="user",
+                content=payload.question,
+                created_at=now,
+            ),
+            ChatMessageRecord(
+                role="assistant",
+                content=answer,
+                created_at=now,
+            )
         ],
     )
+
     db.add(thread)
     db.commit()
     db.refresh(thread)
     return ChatCreateResponse(**_thread_to_schema(thread).model_dump())
-
 
 @router.get("/{chat_id}", response_model=ChatThread)
 def get_chat(chat_id: str, db: Session = Depends(get_db)) -> ChatThread:
