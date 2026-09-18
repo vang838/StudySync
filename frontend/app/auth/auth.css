@@ -225,3 +225,14 @@ footer {
   font-size: 13px;
 }
 
+.auth-error {
+    color: #dc2626;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.auth-success {
+  color: green;
+  text-align: center;
+  margin-bottom: 10px;
+}

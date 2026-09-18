@@ -27,6 +27,10 @@ export default function SignIn()
                                 <input type="password" name="pwd" id="pwd" value = "Enter Password" required />
                             </div>
 
+                            <p className="auth-text">
+                                <a href="/auth/forgotpassword" className="auth-link">Forgot password?</a>
+                            </p>
+
                             <button className="buttons">Continue</button>  
                             
                         </form>
