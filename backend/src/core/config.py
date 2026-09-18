@@ -13,9 +13,12 @@ class Settings(BaseSettings):
     pinecone_api_key: str = Field(default="", alias="PINECONE_API_KEY")
     pinecone_index_name: str = Field(default="", alias="PINECONE_INDEX_NAME")
     pinecone_namespace: str = Field(default="", alias="PINECONE_NAMESPACE")
-    ai_provider: str = Field(default="openai", alias="AI_PROVIDER")
-    ai_api_key: str = Field(default="", alias="AI_API_KEY")
-    ai_model: str = Field(default="", alias="AI_MODEL")
+
+    ai_base_url: str = Field(default="http://127.0.0.1:11434", alias="AI_BASE_URL")
+    ai_provider: str = Field(default="ollama", alias="AI_PROVIDER")
+    ai_model: str = Field(default="qwen3:14b", alias="AI_MODEL")
+    ai_timeout: float = Field(default=120.0,gt=0,alias="AI_TIMEOUT")
+
     embedding_model: str = Field(default="", alias="EMBEDDING_MODEL")
     jwt_secret: str = Field(default="", alias="JWT_SECRET")
 
