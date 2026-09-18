@@ -1,0 +1,14 @@
+import type { ReactNode } from "react";
+
+export default function MainLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {/* Global navigation goes here */}
+      {children}
+    </>
+  );
+}
