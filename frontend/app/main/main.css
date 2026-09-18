@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0E3776;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body 
+{
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+header 
+{
+  @apply h-[80px] border-b-10 border-amber-400 w-full bg-white;
+}
+
+.logo-container 
+{
+  @apply flex h-full items-center px-6 md:px-10;
+}
+
+.logo-container a 
+{
+  @apply inline-flex items-center;
+}
+
+.logo-container img 
+{
+  display: block;
+  max-height: 100px;
+  width: auto;
+}
+
+footer
+{
+    @apply flex bottom-0 left-0 h-[400px] w-full bg-white;
+    margin-top: 60px;
+}
+
+footer {
+  width: 100%;
+  background-color: white;
+  color: #143B61;
+  padding: 90px 8% 20px;
+}
+
+.footer-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 60px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.footer-brand {
+  max-width: 300px;
+}
+
+.footer-brand img {
+  width: 180px;
+  height: auto;
+  margin-bottom: 10px;
+}
+
+.footer-brand p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.footer-links {
+  display: flex;
+  gap: 70px;
+}
+
+.footer-links div {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-links h3 {
+  font-size: 16px;
+  font-weight: bold;
+  color: #143B61;
+  margin-bottom: 5px;
+}
+
+.footer-links a {
+  color: #64748b;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: #01619d;
+  text-decoration: underline;
+}
+
+.footer-bottom {
+  max-width: 1200px;
+  margin: 40px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.footer-bottom p {
+  color: #64748b;
+  font-size: 13px;
+}
+
