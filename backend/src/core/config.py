@@ -9,7 +9,10 @@ class Settings(BaseSettings):
 
     app_env: str = Field(default="development", alias="APP_ENV")
     database_url: str = Field(default="", alias="DATABASE_URL")
-    cors_origins_raw: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+    cors_origins_raw: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        alias="CORS_ORIGINS",
+    )
     pinecone_api_key: str = Field(default="", alias="PINECONE_API_KEY")
     pinecone_index_name: str = Field(default="", alias="PINECONE_INDEX_NAME")
     pinecone_namespace: str = Field(default="", alias="PINECONE_NAMESPACE")

@@ -47,5 +47,16 @@ class ChatMessageRecord(Base):
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
-
     thread: Mapped["ChatThreadRecord"] = relationship(back_populates="messages")
+
+class Course(Base):
+    __tablename__ = "courses"
+
+    course_id: Mapped[str] = mapped_column(String(128), primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    professor: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    subject: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
