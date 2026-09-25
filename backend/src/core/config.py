@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     database_url: str = Field(default="", alias="DATABASE_URL")
     cors_origins_raw: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+
     pinecone_api_key: str = Field(default="", alias="PINECONE_API_KEY")
     pinecone_index_name: str = Field(default="", alias="PINECONE_INDEX_NAME")
     pinecone_namespace: str = Field(default="", alias="PINECONE_NAMESPACE")
@@ -26,6 +27,8 @@ class Settings(BaseSettings):
     r2_access_key_id: str | None = Field(default=None, alias="R2_ACCESS_KEY_ID")
     r2_secret_access_key: str | None = Field(default=None, alias="R2_SECRET_ACCESS_KEY")
     r2_bucket_name: str | None = Field(default=None, alias="R2_BUCKET_NAME")
+
+    document_max_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0, alias="DOCUMENT_MAX_UPLOAD_BYTES")
 
     @property
     def cors_origins(self) -> list[str]:
