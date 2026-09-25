@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.router import api_router
 from src.core.config import settings
 from src.schemas.health import HealthResponse
+from src.db.session import init_db
 
 app = FastAPI(title="StudySync API")
 
@@ -18,6 +19,7 @@ if settings.cors_origins:
 
 app.include_router(api_router, prefix="/api/v1")
 
+init_db()
 
 @app.get("/", response_model=HealthResponse)
 def read_root() -> HealthResponse:

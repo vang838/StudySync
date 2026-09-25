@@ -1,32 +1,59 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import "../auth.css";
 
 export default function ResetPassword() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const email = searchParams.get("email") ?? "";
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSuccess("");
+    async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setSuccess("");
 
-    if (password !== confirmPassword) {
-        setError("Passwords do not match.");
-        return;
+        if (!email) {
+            setError("Missing email. Please return to the forgot password page.");
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setError("Passwords do not match.");
+            return;
+        }
+
+        if (password.length < 8) {
+            setError("Password must be at least 8 characters.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/resetpassword`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.detail ?? "Unable to reset password.");
+                return;
+            }
+
+            setError("");
+            setSuccess(data.message || "Password reset successfully.");
+            router.push("/auth/signin");
+        } catch {
+            setError("Network error. Please try again.");
+        }
     }
-
-    if (password.length < 8) {
-        setError("Password must be at least 8 characters.");
-        return;
-    }
-
-    setError("");
-    setSuccess("Password reset successfully.");
-}
 
     return(
         <main>
