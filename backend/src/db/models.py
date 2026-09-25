@@ -60,3 +60,27 @@ class Course(Base):
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+class ProfessorReview(Base):
+    __tablename__ = "professor_reviews"
+
+    review_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    professor: Mapped[str] = mapped_column(
+        String(200), index=True, nullable=False
+    )
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.course_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    rating: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )
+    feedback: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
