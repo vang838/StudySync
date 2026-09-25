@@ -6,9 +6,16 @@ from src.adapters.llm.ollama import OllamaAdapter
 from src.application.chat_service import ChatService
 from src.core.config import settings
 
-import boto3
+from src.application.document_ingestion_service import DocumentIngestionService
+from src.application.docs_upload import DocumentUploadInspector
+from src.db.session import get_db
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
 from src.ports.object_storage import ObjectStoragePort
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+import boto3
 
 def get_chat_service() -> Generator[ChatService, None, None]:
     """Create configured AI service"""
@@ -42,3 +49,10 @@ def get_object_storage() -> ObjectStoragePort:
     )
 
     return R2ObjectStorageAdapter(client=client, bucket_name=settings.r2_bucket_name)
+
+def get_document_upload_inspector() -> DocumentUploadInspector:
+    return DocumentUploadInspector(max_size_bytes=settings.document_max_upload_bytes)
+
+
+def get_document_ingestion_service(db: Session = Depends(get_db), storage: ObjectStoragePort = Depends(get_object_storage), inspector: DocumentUploadInspector = Depends(get_document_upload_inspector),) -> DocumentIngestionService:
+    return DocumentIngestionService(db=db, storage=storage, inspector=inspector)

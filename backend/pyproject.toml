@@ -11,5 +11,6 @@ dependencies = [
     "ollama>=0.6.2",
     "psycopg[binary]>=3.3.5",
     "pydantic-settings==2.15.0",
+    "python-multipart>=0.0.32",
     "sqlalchemy>=2.0.54",
 ]

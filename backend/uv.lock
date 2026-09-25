@@ -708,6 +708,7 @@ dependencies = [
     { name = "ollama" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
+    { name = "python-multipart" },
     { name = "sqlalchemy" },
 ]
 
@@ -720,6 +721,7 @@ requires-dist = [
     { name = "ollama", specifier = ">=0.6.2" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" },
     { name = "pydantic-settings", specifier = "==2.15.0" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "sqlalchemy", specifier = ">=2.0.54" },
 ]
 

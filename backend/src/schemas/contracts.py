@@ -19,6 +19,16 @@ class DocumentUploadRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     source_url: str | None = None
 
+class DocumentUploadResponse(BaseModel):
+    document_id: str
+    version_id: str
+    job_id: str
+    course_id: str
+    title: str
+    original_filename: str
+    file_size_bytes: int
+    status: str
+
 
 class ChatCreateRequest(BaseModel):
     course_id: str
