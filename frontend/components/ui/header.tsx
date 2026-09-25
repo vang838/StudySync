@@ -24,7 +24,7 @@ export default function Header() {
         <NavigationMenu className="max-w-none justify-self-center -translate-y-2">
             <NavigationMenuList className="flex items-center gap-6">
                 <NavigationMenuItem>
-                    <NavigationMenuLink href="#overview" data-active="true" className="py-2 text-sm">
+                    <NavigationMenuLink href="/dashboard" data-active="true" className="py-2 text-sm">
                         Overview
                     </NavigationMenuLink>
                 </NavigationMenuItem>
@@ -42,8 +42,8 @@ export default function Header() {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
-                    <NavigationMenuLink href="/dashboard" className="py-2 text-sm">
-                        Student Dashboard
+                    <NavigationMenuLink href="/courses/course_search" className="py-2 text-sm">
+                        Course Search
                     </NavigationMenuLink>
                 </NavigationMenuItem>
             </NavigationMenuList>
