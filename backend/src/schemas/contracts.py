@@ -15,6 +15,22 @@ class AuthRegisterRequest(BaseModel):
     password: str = Field(min_length=8)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+
+
+class AuthRegisterRequest(BaseModel):
+    first_name: str = Field(min_length=1, max_length=128)
+    last_name: str = Field(min_length=1, max_length=128)
+    email: EmailStr
+    password: str = Field(min_length=8)
+
+
 class CourseCreateRequest(BaseModel):
     course_id: str = Field(min_length=2, max_length=128)
     title: str = Field(min_length=1, max_length=200)
