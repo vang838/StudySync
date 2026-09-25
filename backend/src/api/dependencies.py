@@ -12,6 +12,9 @@ from src.application.document_extraction_service import DocumentExtractionServic
 from src.application.document_parser import DocumentParserRegistry
 from src.application.document_normalization_service import DocumentNormalizationService
 from src.application.document_normalizer import DocumentNormalizer
+from src.application.document_chunker import DocumentChunker
+from src.application.document_chunker_service import DocumentChunkingService
+
 from src.db.session import get_db
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
 from src.ports.object_storage import ObjectStoragePort
@@ -73,3 +76,10 @@ def get_document_normalizer() -> DocumentNormalizer:
 
 def get_document_normalization_service(db: Session = Depends(get_db), extraction_service: DocumentExtractionService = Depends(get_document_extraction_service), normalizer: DocumentNormalizer = Depends(get_document_normalizer),) -> DocumentNormalizationService:
     return DocumentNormalizationService(db=db, extraction_service=extraction_service, normalizer=normalizer)
+
+def get_document_chunker() -> DocumentChunker:
+    return DocumentChunker(max_words=settings.document_chunk_max_words, overlap_words=settings.document_chunk_overlap_words,)
+
+
+def get_document_chunking_service(db: Session = Depends(get_db), normalization_service: DocumentNormalizationService = Depends(get_document_normalization_service), chunker: DocumentChunker = Depends(get_document_chunker),) -> DocumentChunkingService:
+    return DocumentChunkingService(db=db, normalization_service=normalization_service, chunker=chunker)

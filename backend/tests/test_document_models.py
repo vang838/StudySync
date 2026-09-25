@@ -52,3 +52,7 @@ class TestDocumentModels(TestCase):
         self.assertIn("page_end", columns)
         self.assertIn("section_title", columns)
         self.assertIn("token_count", columns)
+        self.assertIn("source_start_index", columns)
+        self.assertIn("source_end_index", columns)
+        self.assertIn("source_start_label", columns)
+        self.assertIn("source_end_label", columns)

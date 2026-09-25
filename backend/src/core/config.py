@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     r2_bucket_name: str | None = Field(default=None, alias="R2_BUCKET_NAME")
 
     document_max_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0, alias="DOCUMENT_MAX_UPLOAD_BYTES")
+    document_chunk_max_words: int = Field(default=300, gt=0, alias="DOCUMENT_CHUNK_MAX_WORDS")
+    document_chunk_overlap_words: int = Field(default=50, ge=0, alias="DOCUMENT_CHUNK_OVERLAP_WORDS")
 
     @property
     def cors_origins(self) -> list[str]:

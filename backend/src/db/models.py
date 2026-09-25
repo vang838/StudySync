@@ -140,6 +140,10 @@ class DocumentChunkRecord(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
 
+    source_start_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_end_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_start_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_end_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
     page_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
     page_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
     section_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
