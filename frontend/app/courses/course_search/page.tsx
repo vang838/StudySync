@@ -2,6 +2,17 @@
 
 import Link from 'next/link';
 import React, { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { Course, CourseSearchFilters } from '@/lib/types/course';
 
 type ApiCourse = {
@@ -78,114 +89,134 @@ export default function CourseSearchPage() {
     }, [handleSearch]);
 
     return (
-        <div className="container mx-auto p-6">
-            <div className="mb-8 flex items-center justify-between gap-4">
-                <h1 className="text-3xl font-bold">Course Catalog</h1>
-                <Link
-                    href="/courses/create"
-                    className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                >
-                    Create Course
-                </Link>
+        <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
+            <div className="mx-auto flex max-w-6xl flex-col gap-10 pb-10">
+                <header className="flex flex-wrap items-end justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                        <p className="text-sm font-medium text-muted-foreground">StudySync Courses</p>
+                        <h1 className="font-heading text-3xl font-bold">Course Catalog</h1>
+                    </div>
+                    <Link href="/courses/create">
+                        <Button>Create Course</Button>
+                    </Link>
+                </header>
+
+                <Separator />
+
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    <aside className="lg:col-span-4 xl:col-span-3">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Filter Courses</CardTitle>
+                                <CardDescription>Narrow results by subject, number, or professor.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted-foreground">Subject</label>
+                                    <select
+                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                        value={filters.subject}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
+                                    >
+                                        <option value="">All Subjects</option>
+                                        <option value="Computer Science">Computer Science</option>
+                                        <option value="Data Science">Data Science</option>
+                                        <option value="Mathematics">Mathematics</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted-foreground">Course Number</label>
+                                    <Input
+                                        className="w-full"
+                                        value={filters.courseNumber}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, courseNumber: e.target.value }))}
+                                        placeholder="CS101"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted-foreground">Professor</label>
+                                    <Input
+                                        className="w-full"
+                                        value={filters.professor}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, professor: e.target.value }))}
+                                        placeholder="Reed"
+                                    />
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                <Button onClick={handleSearch} className="w-full">Apply Filters</Button>
+                            </CardFooter>
+                        </Card>
+                    </aside>
+
+                    <section className="space-y-6 lg:col-span-8 xl:col-span-9">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Search Courses</CardTitle>
+                                <CardDescription>Find classes by name, topic, or keyword.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-3 sm:flex-row">
+                                <Input
+                                    className="w-full"
+                                    type="text"
+                                    placeholder="Search by course name or keyword..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleSearch();
+                                        }
+                                    }}
+                                />
+                                <Button onClick={handleSearch} disabled={loading}>
+                                    {loading ? 'Searching...' : 'Search'}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Results</CardTitle>
+                                <CardDescription>
+                                    {courses.length} course{courses.length === 1 ? '' : 's'} found
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+                                {loading && <p className="text-sm text-muted-foreground">Loading course results...</p>}
+                                {!loading && !error && courses.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">No courses found matching your criteria.</p>
+                                )}
+
+                                {!loading && !error && courses.length > 0 && (
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        {courses.map((course) => (
+                                            <Link key={course.id} href={`/courses/${course.id}`} className="block">
+                                                <Card className="transition hover:ring-2 hover:ring-primary/40">
+                                                    <CardHeader>
+                                                        <CardTitle>{course.name}</CardTitle>
+                                                        <CardDescription>{course.subject}</CardDescription>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-1 text-sm text-muted-foreground">
+                                                        <p>Course Number: {course.courseNumber}</p>
+                                                        <p>Professor: {course.professor}</p>
+                                                        <p>Year: {course.year}</p>
+                                                    </CardContent>
+                                                    <CardFooter>
+                                                        <Button variant="secondary" size="s">Open Overview</Button>
+                                                    </CardFooter>
+                                                </Card>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </section>
+                </div>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Sidebar for Filters */}
-                <aside className="lg:col-span-3">
-                    <div className="sticky top-6 p-4 border rounded-lg shadow-sm bg-white">
-                        <h2 className="text-xl font-semibold mb-4">Filter Courses</h2>
-                        {/* Filter Inputs will go here */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium mb-1">Subject</label>
-                            <select 
-                                className="w-full p-2 border rounded" 
-                                value={filters.subject} 
-                                onChange={(e) => setFilters(prev => ({ ...prev, subject: e.target.value }))}
-                            >
-                                <option value="">All Subjects</option>
-                                <option value="Computer Science">Computer Science</option>
-                                <option value="Data Science">Data Science</option>
-                            </select>
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium mb-1">Course Number</label>
-                            <input 
-                                type="text" 
-                                className="w-full p-2 border rounded" 
-                                value={filters.courseNumber} 
-                                onChange={(e) => setFilters(prev => ({ ...prev, courseNumber: e.target.value }))}
-                            />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium mb-1">Professor</label>
-                            <input
-                                type="text"
-                                className="w-full p-2 border rounded"
-                                value={filters.professor}
-                                onChange={(e) => setFilters(prev => ({ ...prev, professor: e.target.value }))}
-                                placeholder="e.g., Reed"
-                            />
-                        </div>
-                        <button 
-                            onClick={handleSearch}
-                            className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-150"
-                        >
-                            Apply Filters
-                        </button>
-                    </div>
-                </aside>
-
-                {/* Main Content Area */}
-                <main className="lg:col-span-9">
-                    {/* Search Bar */}
-                    <div className="mb-8 p-4 border rounded-lg shadow-sm bg-white">
-                        <h2 className="text-xl font-semibold mb-3">Search Courses</h2>
-                        <div className="flex gap-3">
-                            <input 
-                                type="text" 
-                                placeholder="Search by course name or keyword..." 
-                                className="flex-grow p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-                            />
-                            <button 
-                                onClick={handleSearch}
-                                disabled={loading}
-                                className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 transition duration-150"
-                            >
-                                {loading ? 'Searching...' : 'Search'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Results Display */}
-                    <div className="mb-6 p-4 border rounded-lg shadow-sm bg-white">
-                        {error && <p className="text-red-600 font-medium">{error}</p>}
-                        {loading && <p className="text-blue-600 font-medium">Loading course results...</p>}
-                        {!loading && !error && courses.length === 0 && <p className="text-gray-600">No courses found matching your criteria.</p>}
-                        {!loading && !error && courses.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {courses.map(course => (
-                                    <Link key={course.id} href={`/courses/${course.id}`} className="block">
-                                        <article className="rounded-lg border bg-white p-5 shadow-sm transition hover:border-blue-300 hover:shadow-md">
-                                            <div className="mb-3 flex items-center justify-between gap-2">
-                                                <h3 className="text-lg font-semibold text-gray-900">{course.name}</h3>
-                                                <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                                                    {course.subject}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-gray-600">Course Number: {course.courseNumber}</p>
-                                            <p className="text-sm text-gray-600">Professor: {course.professor}</p>
-                                            <p className="text-sm text-gray-600">Year: {course.year}</p>
-                                        </article>
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </main>
-            </div>
-        </div>
+        </main>
     );
 }

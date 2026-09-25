@@ -1,4 +1,7 @@
 import { Metadata } from "next";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import CourseOverview from "@/components/course-overview/CourseOverview";
 
 export const metadata: Metadata = {
@@ -18,13 +21,28 @@ export default async function CourseDetailPage({
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-10">
-      <header>
-        <h1 className="text-4xl font-bold text-gray-900">Course Overview: {courseId}</h1>
-        <p className="text-lg text-gray-600 mt-2">Your central hub for everything related to this course.</p>
-      </header>
+    <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-10 pb-10">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-muted-foreground">Course Workspace</p>
+            <h1 className="font-heading text-3xl font-bold">Course Overview</h1>
+            <p className="text-sm text-muted-foreground">Course ID: {courseId}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/courses/course_search">
+              <Button variant="secondary" size="s">Back to Catalog</Button>
+            </Link>
+            <Link href="/courses/create">
+              <Button size="s">Create Course</Button>
+            </Link>
+          </div>
+        </header>
 
-      <CourseOverview courseId={courseId} />
-    </div>
+        <Separator />
+
+        <CourseOverview courseId={courseId} />
+      </div>
+    </main>
   );
 }
