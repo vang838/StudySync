@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     embedding_model: str = Field(default="", alias="EMBEDDING_MODEL")
     jwt_secret: str = Field(default="", alias="JWT_SECRET")
 
+    r2_endpoint_url: str | None = Field(default=None, alias="R2_ENDPOINT_URL")
+    r2_access_key_id: str | None = Field(default=None, alias="R2_ACCESS_KEY_ID")
+    r2_secret_access_key: str | None = Field(default=None, alias="R2_SECRET_ACCESS_KEY")
+    r2_bucket_name: str | None = Field(default=None, alias="R2_BUCKET_NAME")
+
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
