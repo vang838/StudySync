@@ -86,3 +86,15 @@ class TestDocumentExtractionService(TestCase):
         self.service.extract(version_id="ver123")
 
         self.registry.get.assert_called_once_with(self.version.detected_media_type)
+
+    def test_extracts_with_real_parser_registry(self):
+        storage = FakeObjectStorage(b"Operating systems manage processes.")
+        registry = DocumentParserRegistry()
+        service = DocumentExtractionService(db=self.db, storage=storage, parser_registry=registry)
+
+        result = service.extract(version_id="ver123")
+
+        self.assertEqual(result.media_type, "text/plain")
+        self.assertEqual(len(result.segments), 1)
+        self.assertEqual(result.segments[0].text, "Operating systems manage processes.")
+        self.assertEqual(result.segments[0].source_label, "text:1")
