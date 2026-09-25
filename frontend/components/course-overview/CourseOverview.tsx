@@ -1,6 +1,4 @@
 import React from 'react';
-// Assuming you might need other utilities or icons here
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; 
 
 interface CourseOverviewProps {
   courseId: string;
@@ -20,8 +18,7 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      
-      {/* 1. Course Information (Takes up two-thirds width on large screens) */}
+      {/* 1. Course Information */}
       <section className="lg:col-span-2 space-y-6 p-6 border rounded-lg bg-white shadow-lg">
         <div className="border-b pb-4 mb-4">
           <h2 className="text-3xl font-semibold text-indigo-700">📚 Course Information</h2>
@@ -45,7 +42,7 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
         </div>
       </section>
 
-      {/* 4. Forum & Sidebar (Takes up one-third width on large screens) */}
+      {/* 4. Forum & Sidebar */}
       <aside className="lg:col-span-1 space-y-8">
         
         {/* Forum */}
