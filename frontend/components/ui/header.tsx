@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -11,15 +12,19 @@ export default function Header() {
     <header className="grid h-16 w-full grid-cols-[1fr_auto_1fr] items-center border-b-4 border-amber-400 px-8">
         
                  
-        <div className="justify-self-start">
+        <Link
+            href="/"
+            aria-label="Go to StudySync main page"
+             className="justify-self-start"
+            >
             <Image className = "-translate-y-2" src="/StudySync.png" alt="StudySync logo" width={125} height={50} priority/>
-        </div>
+        </Link>
         
         {/*Options that's in the middle */}
         <NavigationMenu className="max-w-none justify-self-center -translate-y-2">
             <NavigationMenuList className="flex items-center gap-6">
                 <NavigationMenuItem>
-                    <NavigationMenuLink href="#overview" data-active="true" className="py-2 text-sm">
+                    <NavigationMenuLink href="/dashboard" data-active="true" className="py-2 text-sm">
                         Overview
                     </NavigationMenuLink>
                 </NavigationMenuItem>
