@@ -37,8 +37,8 @@ export default function Header() {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
-                    <NavigationMenuLink href="#resources" className="py-2 text-sm">
-                        Resources
+                    <NavigationMenuLink href="/courses/course_search" className="py-2 text-sm">
+                        Course Search
                     </NavigationMenuLink>
                 </NavigationMenuItem>
             </NavigationMenuList>

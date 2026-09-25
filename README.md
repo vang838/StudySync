@@ -90,27 +90,52 @@ Before setting up the database, ensure you have:
 - PostgreSQL 17 installed and running
 - `psql` available on your PATH
 
+If `psql` or `createdb` is not recognized in PowerShell, add PostgreSQL tools to PATH for the current terminal session:
+```powershell
+$env:Path += ";C:\Program Files\PostgreSQL\17\bin"
+```
+
 ### 1. Create the database
-```text
+```powershell
 createdb -U postgres studysync
 ```
 
+If the database already exists, this command will fail with an "already exists" message, which is safe to ignore.
+
 ### 2. Set the backend connection string
 ```powershell
+cd backend
 $env:DATABASE_URL = 'postgresql+psycopg://postgres:<password>@localhost:5432/studysync'
 ```
 
 ### 3. Initialize the database schema
 ```powershell
-cd backend
 $env:DATABASE_URL = 'postgresql+psycopg://postgres:<password>@localhost:5432/studysync'
 uv run python -c "from src.db.session import init_db; init_db()"
 ```
+
+This creates tables and seeds initial course records used for testing.
 
 ### 4. Start the backend against PostgreSQL
 ```powershell
 $env:DATABASE_URL = 'postgresql+psycopg://postgres:<password>@localhost:5432/studysync'
 uv run python -m uvicorn src.main:app --reload
+```
+
+### 5. View the database and seeded data
+```powershell
+psql -U postgres -d studysync
+```
+
+Inside `psql`, run:
+```sql
+\dt
+SELECT course_id, title, subject, year FROM courses ORDER BY course_id;
+```
+
+Exit `psql` with:
+```sql
+\q
 ```
 
 ## System Architecture

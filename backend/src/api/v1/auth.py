@@ -103,7 +103,7 @@ def signup(
         password_hash=hashed_password
     )
 
-    # Create user
+    # Save user
     db.add(new_user)
     db.commit()
     db.refresh(new_user)

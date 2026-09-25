@@ -57,32 +57,15 @@ export default function SignIn() {
                             <p>Sign In with your Study Sync account</p>
                         </div>
                     </div>
-
-                    <div className="auth-item">
+                    <div className = "auth-item">
                         <form onSubmit={handleSubmit}>
                             <div>
-                                <label htmlFor="email"></label>
-                                <input
-                                    type="text"
-                                    placeholder="Enter Email"
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    name="email"
-                                    id="email"
-                                    value={email}
-                                    required
-                                />
+                                <label htmlFor ="email"></label>
+                                <input type="text" placeholder="Enter Email" onChange={(e) => setEmail(e.target.value)} name="email" id="email" value ={email} required />
                             </div>
                             <div>
-                                <label htmlFor="pwd"></label>
-                                <input
-                                    type="password"
-                                    placeholder="Enter Password"
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    name="pwd"
-                                    id="pwd"
-                                    value={password}
-                                    required
-                                />
+                                <label htmlFor ="pwd"></label>
+                                <input type="password" placeholder="Enter Password" onChange={(e) => setPassword(e.target.value)} name="pwd" id="pwd" value = {password} required />
                             </div>
 
                             {error && <p className="auth-error">{error}</p>}

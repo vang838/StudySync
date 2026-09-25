@@ -8,6 +8,12 @@ class AuthLoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
 
+class AuthRegisterRequest(BaseModel):
+    first_name: str = Field(min_length=1, max_length=128)
+    last_name: str = Field(min_length=1, max_length=128)
+    email: EmailStr
+    password: str = Field(min_length=8)
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -26,8 +32,12 @@ class AuthRegisterRequest(BaseModel):
 
 
 class CourseCreateRequest(BaseModel):
+    course_id: str = Field(min_length=2, max_length=128)
     title: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    subject: str = Field(min_length=1, max_length=128)
+    year: int = Field(ge=1900, le=2100)
+    professor: str | None = Field(default=None, max_length=200)
 
 
 class DocumentUploadRequest(BaseModel):
