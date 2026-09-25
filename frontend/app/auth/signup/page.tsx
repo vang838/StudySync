@@ -48,7 +48,7 @@ export default function SignUp()
             return;
         }
 
-        router.push("/main/public_homepage");
+        router.push("/dashboard");
         router.refresh();
         } catch {
             setError("Something went wrong.");

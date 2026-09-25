@@ -4,10 +4,52 @@ from sqlalchemy.orm import Session
 
 from src.db.models import User
 from src.db.session import get_db
-from src.schemas.contracts import AuthLoginRequest, AuthRegisterRequest
+from src.schemas.contracts import (
+    AuthLoginRequest,
+    AuthRegisterRequest,
+    ForgotPasswordRequest,
+    PasswordResetRequest,
+)
 from src.core.security import hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/forgotpassword")
+def forgotpassword(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    email = str(payload.email).strip().lower()
+    db.scalar(select(User).where(User.user_email == email))
+
+    return {
+        "message": "If an account exists for this email, a password reset link has been sent."
+    }
+
+
+@router.post("/resetpassword")
+def resetpassword(payload: PasswordResetRequest, db: Session = Depends(get_db)):
+    email = str(payload.email).strip().lower()
+    existing_user = db.scalar(select(User).where(User.user_email == email))
+
+    if not existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    existing_user.password_hash = hash_password(payload.password)
+    db.commit()
+    db.refresh(existing_user)
+
+    return {
+        "message": "Password reset successfully.",
+        "user": {
+            "user_id": existing_user.user_id,
+            "first_name": existing_user.user_first_name,
+            "last_name": existing_user.user_last_name,
+            "email": existing_user.user_email,
+        },
+    }
+
 
 @router.post("/login")
 def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
