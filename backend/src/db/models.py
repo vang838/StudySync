@@ -10,6 +10,18 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True,autoincrement=True)
+    user_first_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_last_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_email: Mapped[str] = mapped_column(String(128), unique=True, index=True,nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(258),nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+ 
+
 class ChatThreadRecord(Base):
     __tablename__ = "chat_threads"
 
