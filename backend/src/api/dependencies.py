@@ -8,6 +8,8 @@ from src.core.config import settings
 
 from src.application.document_ingestion_service import DocumentIngestionService
 from src.application.docs_upload import DocumentUploadInspector
+from src.application.document_extraction_service import DocumentExtractionService
+from src.application.document_parser import DocumentParserRegistry
 from src.db.session import get_db
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
 from src.ports.object_storage import ObjectStoragePort
@@ -56,3 +58,10 @@ def get_document_upload_inspector() -> DocumentUploadInspector:
 
 def get_document_ingestion_service(db: Session = Depends(get_db), storage: ObjectStoragePort = Depends(get_object_storage), inspector: DocumentUploadInspector = Depends(get_document_upload_inspector),) -> DocumentIngestionService:
     return DocumentIngestionService(db=db, storage=storage, inspector=inspector)
+
+def get_document_parser_registry() -> DocumentParserRegistry:
+    return DocumentParserRegistry()
+
+
+def get_document_extraction_service(db: Session = Depends(get_db), storage: ObjectStoragePort = Depends(get_object_storage), parser_registry: DocumentParserRegistry = Depends(get_document_parser_registry),) -> DocumentExtractionService:
+    return DocumentExtractionService(db=db, storage=storage, parser_registry=parser_registry)
