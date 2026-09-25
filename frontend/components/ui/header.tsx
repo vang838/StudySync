@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -8,6 +10,12 @@ import {
 } from "@/components/ui/navigation-menu";
 
 export default function Header() {
+
+ async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.replace("/auth/signin");
+  }
+
   return (
     <header className="grid h-16 w-full grid-cols-[1fr_auto_1fr] items-center border-b-4 border-amber-400 px-8">
         
@@ -54,8 +62,8 @@ export default function Header() {
             <NavigationMenu className="max-w-none">
                 <NavigationMenuList>
                     <NavigationMenuItem>
-                        <NavigationMenuLink  href="#signin" className="py-2 text-sm">
-                            Sign In
+                        <NavigationMenuLink  onClick={logout} className="py-2 text-sm">
+                         Logout
                         </NavigationMenuLink>
                     </NavigationMenuItem>
                 </NavigationMenuList>
