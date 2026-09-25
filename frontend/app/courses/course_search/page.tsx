@@ -79,7 +79,15 @@ export default function CourseSearchPage() {
 
     return (
         <div className="container mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-8">Course Catalog</h1>
+            <div className="mb-8 flex items-center justify-between gap-4">
+                <h1 className="text-3xl font-bold">Course Catalog</h1>
+                <Link
+                    href="/courses/create"
+                    className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                >
+                    Create Course
+                </Link>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Sidebar for Filters */}

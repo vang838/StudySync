@@ -10,8 +10,12 @@ class AuthLoginRequest(BaseModel):
 
 
 class CourseCreateRequest(BaseModel):
+    course_id: str = Field(min_length=2, max_length=128)
     title: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    subject: str = Field(min_length=1, max_length=128)
+    year: int = Field(ge=1900, le=2100)
+    professor: str | None = Field(default=None, max_length=200)
 
 
 class DocumentUploadRequest(BaseModel):

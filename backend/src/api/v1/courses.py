@@ -87,9 +87,30 @@ def list_courses():
     )
 
 @router.post("")
-def create_course(payload: CourseCreateRequest):
-    # Implementation for creation should be done here later.
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Course creation is not implemented yet.",
+def create_course(payload: CourseCreateRequest, db: Session = Depends(get_db)) -> dict:
+    normalized_course_id = payload.course_id.strip()
+    if not normalized_course_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="course_id cannot be blank.",
+        )
+
+    existing = db.query(Course).filter(Course.course_id == normalized_course_id).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Course '{normalized_course_id}' already exists.",
+        )
+
+    created = Course(
+        course_id=normalized_course_id,
+        title=payload.title.strip(),
+        description=payload.description.strip() if payload.description else None,
+        subject=payload.subject.strip(),
+        year=payload.year,
+        professor=payload.professor.strip() if payload.professor else None,
     )
+    db.add(created)
+    db.commit()
+    db.refresh(created)
+    return _serialize_course(created)
