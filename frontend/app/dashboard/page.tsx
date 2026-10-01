@@ -1,6 +1,7 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import Link from "next/link";
+import {useSyncExternalStore} from "react";
 import {HugeiconsIcon} from "@hugeicons/react";
 import {
     ArrowRight01Icon,
@@ -28,6 +29,57 @@ const courses = [
     },
     {code: "HIST 108", name: "World History", progress: 85},
 ];
+
+let cachedSavedCoursesRaw: string | null = null;
+let cachedSavedCoursesSnapshot = courses;
+
+function getSavedCoursesSnapshot() {
+    if (typeof window === "undefined") {
+        return courses;
+    }
+
+    try {
+        const raw = window.localStorage.getItem("saved_courses");
+        if (!raw) {
+            return courses;
+        }
+
+        if (raw === cachedSavedCoursesRaw) {
+            return cachedSavedCoursesSnapshot;
+        }
+
+        const parsedCourses = JSON.parse(raw);
+        if (Array.isArray(parsedCourses) && parsedCourses.length > 0) {
+            cachedSavedCoursesRaw = raw;
+            cachedSavedCoursesSnapshot = parsedCourses;
+            return cachedSavedCoursesSnapshot;
+        }
+    } catch (error) {
+        console.warn("Unable to load saved courses from localStorage.", error);
+    }
+
+    cachedSavedCoursesRaw = null;
+    cachedSavedCoursesSnapshot = courses;
+    return courses;
+}
+
+function subscribeToSavedCourses(onStoreChange: () => void) {
+    if (typeof window === "undefined") {
+        return () => {};
+    }
+
+    const handleStorageChange = (event: StorageEvent) => {
+        if (!event.key || event.key === "saved_courses") {
+            onStoreChange();
+        }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+        window.removeEventListener("storage", handleStorageChange);
+    };
+}
 
 const uploads = [
     {
@@ -122,27 +174,11 @@ function SectionHeading({
 }
 
 export default function StudentDashboardPage() {
-    const [savedCourses, setSavedCourses] = useState(courses);
-
-    useEffect(() => {
-        if (typeof window === "undefined") {
-            return;
-        }
-
-        try {
-            const raw = window.localStorage.getItem("saved_courses");
-            if (!raw) {
-                return;
-            }
-
-            const parsedCourses = JSON.parse(raw);
-            if (Array.isArray(parsedCourses) && parsedCourses.length > 0) {
-                setSavedCourses(parsedCourses);
-            }
-        } catch (error) {
-            console.warn("Unable to load saved courses from localStorage.", error);
-        }
-    }, []);
+    const savedCourses = useSyncExternalStore(
+        subscribeToSavedCourses,
+        getSavedCoursesSnapshot,
+        () => courses
+    );
 
     const averageProgress = Math.round(
         savedCourses.reduce(
@@ -270,45 +306,50 @@ export default function StudentDashboardPage() {
 
                             <div className="grid gap-4 md:grid-cols-3">
                                 {savedCourses.map((course) => (
-                                    <Card
+                                    <Link
                                         key={course.code}
-                                        size="sm"
-                                        className="gap-0"
+                                        href={`/courses/${encodeURIComponent(course.code)}`}
+                                        className="block"
                                     >
-                                        <CardHeader>
-                                            <p className="text-xs font-semibold text-secondary">
-                                                {course.code}
-                                            </p>
-                                            <CardTitle className="text-sm">
-                                                {course.name}
-                                            </CardTitle>
-                                        </CardHeader>
+                                        <Card
+                                            size="sm"
+                                            className="gap-0"
+                                        >
+                                            <CardHeader>
+                                                <p className="text-xs font-semibold text-secondary">
+                                                    {course.code}
+                                                </p>
+                                                <CardTitle className="text-sm">
+                                                    {course.name}
+                                                </CardTitle>
+                                            </CardHeader>
 
-                                        <CardContent>
-                                            <div className="flex justify-between text-xs text-muted-foreground">
-                                                <span>Sample progress</span>
-                                                <span>{course.progress}%</span>
-                                            </div>
+                                            <CardContent>
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>Sample progress</span>
+                                                    <span>{course.progress}%</span>
+                                                </div>
 
-                                            <div
-                                                className="mt-2 h-2 overflow-hidden rounded-full bg-background"
-                                                role="progressbar"
-                                                aria-label={
-                                                    course.name + " progress"
-                                                }
-                                                aria-valuenow={course.progress}
-                                                aria-valuemin={0}
-                                                aria-valuemax={100}
-                                            >
                                                 <div
-                                                    className="h-full rounded-full bg-secondary"
-                                                    style={{
-                                                        width: course.progress + "%",
-                                                    }}
-                                                />
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                                    className="mt-2 h-2 overflow-hidden rounded-full bg-background"
+                                                    role="progressbar"
+                                                    aria-label={
+                                                        course.name + " progress"
+                                                    }
+                                                    aria-valuenow={course.progress}
+                                                    aria-valuemin={0}
+                                                    aria-valuemax={100}
+                                                >
+                                                    <div
+                                                        className="h-full rounded-full bg-secondary"
+                                                        style={{
+                                                            width: course.progress + "%",
+                                                        }}
+                                                    />
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </Link>
                                 ))}
                             </div>
                         </section>

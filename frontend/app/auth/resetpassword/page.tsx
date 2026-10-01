@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import "../auth.css";
 
 export default function ResetPassword() {
     const router = useRouter();

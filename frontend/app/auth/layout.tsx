@@ -25,7 +25,7 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
 
   const featuredItem = await getRandomItem();
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <div className={`auth-shell ${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <div className="min-h-full flex flex-col">
         <header>
           <div className="logo-container">
