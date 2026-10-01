@@ -396,7 +396,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
                     {countReplies(post)} repl{countReplies(post) === 1 ? "y" : "ies"}
                   </span>
                   <Link href={`/courses/${encodeURIComponent(courseId)}/forum/${post.post_id}`}>
-                    <Button size="s" variant="outline">Open discussion</Button>
+                    <Button size="xs" variant="outline">Open discussion</Button>
                   </Link>
                 </div>
               </div>

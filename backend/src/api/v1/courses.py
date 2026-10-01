@@ -29,6 +29,18 @@ def _serialize_course(course: Course) -> dict:
     }
 
 
+def _serialize_user(user: User) -> dict:
+    return {
+        "user_id": user.user_id,
+        "first_name": user.user_first_name,
+        "last_name": user.user_last_name,
+        "full_name": f"{user.user_first_name} {user.user_last_name}".strip(),
+        "email": user.user_email,
+        "created_at": user.created_at,
+        "updated_at": user.updated_at,
+    }
+
+
 def _get_course_or_404(db: Session, course_id: str) -> Course:
     course = db.get(Course, course_id)
     if course is None:
@@ -305,6 +317,21 @@ def list_saved_courses(
         .order_by(Course.title.asc())
     ).all()
     return [_serialize_course(course) for course in saved_courses]
+
+
+@router.get("/{course_id}/members")
+def list_course_members(
+    course_id: str,
+    db: Session = Depends(get_db),
+) -> List[dict]:
+    _get_course_or_404(db, course_id)
+    members = db.scalars(
+        select(User)
+        .join(UserCourseSave, UserCourseSave.user_id == User.user_id)
+        .where(UserCourseSave.course_id == course_id)
+        .order_by(User.user_first_name.asc(), User.user_last_name.asc())
+    ).all()
+    return [_serialize_user(member) for member in members]
 
 
 @router.get("/users/{user_id}/saved-courses")

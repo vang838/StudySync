@@ -137,6 +137,48 @@ class TestCourseSaveAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), ["Biology", "Computer Science"])
 
+    def test_course_members_and_user_profile_endpoints(self):
+        with self.session_factory() as db:
+            db.add(
+                User(
+                    user_first_name="Ada",
+                    user_last_name="Lovelace",
+                    user_email="ada@example.com",
+                    password_hash="hashed-password",
+                )
+            )
+            db.add(
+                User(
+                    user_first_name="Grace",
+                    user_last_name="Hopper",
+                    user_email="grace@example.com",
+                    password_hash="hashed-password",
+                )
+            )
+            db.add(
+                Course(
+                    course_id="CS101",
+                    title="Intro to Computer Science",
+                    description="Foundations of programming.",
+                    subject="Computer Science",
+                    year=2025,
+                    professor="Dr. Reed",
+                )
+            )
+            db.commit()
+
+        self.client.post("/api/v1/courses/CS101/save?user_id=2")
+        self.client.post("/api/v1/courses/CS101/save?user_id=1")
+
+        members_response = self.client.get("/api/v1/courses/CS101/members")
+        self.assertEqual(members_response.status_code, 200)
+        members = members_response.json()
+        self.assertEqual([member["full_name"] for member in members], ["Ada Lovelace", "Grace Hopper"])
+
+        profile_response = self.client.get("/api/v1/users/1")
+        self.assertEqual(profile_response.status_code, 200)
+        self.assertEqual(profile_response.json()["full_name"], "Ada Lovelace")
+
     def test_course_forum_thread_crud_permissions(self):
         with self.session_factory() as db:
             db.add(
