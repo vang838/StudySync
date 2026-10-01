@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import "../auth.css";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 export default function SignUp()
@@ -28,7 +27,7 @@ export default function SignUp()
         }
 
         try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/signup`, {
+        const res = await fetch(`/api/auth/signup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -91,6 +90,9 @@ export default function SignUp()
                                 <label htmlFor ="pwd"></label>
                                 <input type="password" placeholder="Enter Password" onChange={(e) => setPassword(e.target.value)} name="pwd" id="pwd" value={password} required />
                             </div>
+
+                            {error && <p className="auth-error">{error}</p>}
+                            {success && <p className="auth-success">{success}</p>}
 
                             <button className="buttons">Continue</button>  
                             

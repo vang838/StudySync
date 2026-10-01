@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import "../auth.css";
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -17,7 +16,7 @@ export default function ForgotPassword() {
     setSuccess("");
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/forgotpassword`, {
+      const res = await fetch(`/api/auth/forgotpassword`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

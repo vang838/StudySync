@@ -43,6 +43,8 @@ export default function CreateCoursePage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch('/api/courses', {
@@ -50,6 +52,7 @@ export default function CreateCoursePage() {
         headers: {
           'content-type': 'application/json',
         },
+        signal: controller.signal,
         body: JSON.stringify({
           course_id: form.course_id.trim(),
           title: form.title.trim(),
@@ -68,9 +71,14 @@ export default function CreateCoursePage() {
       const created = await response.json();
       router.push(`/courses/${created.course_id}`);
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : 'Unable to create course.';
+      const message = submitError instanceof Error
+        ? submitError.name === 'AbortError'
+          ? 'Creating the course timed out. Please ensure the backend is running and try again.'
+          : submitError.message
+        : 'Unable to create course.';
       setError(message);
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   };
