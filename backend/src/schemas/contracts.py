@@ -40,6 +40,21 @@ class CourseCreateRequest(BaseModel):
     professor: str | None = Field(default=None, max_length=200)
 
 
+class SaveCourseRequest(BaseModel):
+    user_id: int = Field(ge=1)
+
+
+class ForumPostCreateRequest(BaseModel):
+    user_id: int = Field(ge=1)
+    content: str = Field(min_length=1, max_length=4000)
+    parent_post_id: int | None = Field(default=None, ge=1)
+
+
+class ForumPostUpdateRequest(BaseModel):
+    user_id: int = Field(ge=1)
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class DocumentUploadRequest(BaseModel):
     course_id: str
     title: str = Field(min_length=1, max_length=200)
