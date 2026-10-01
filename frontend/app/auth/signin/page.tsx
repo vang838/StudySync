@@ -26,7 +26,7 @@ export default function SignIn() {
         }
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/login`, {
+            const res = await fetch(`/api/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
@@ -79,7 +79,7 @@ export default function SignIn() {
                     </div>
 
                     <div className="auth-item">
-                        <p className="auth-text">Don't have an account? <a href="/auth/signup" className="auth-link">Sign up</a></p>
+                        <p className="auth-text">Don&apos;t have an account? <a href="/auth/signup" className="auth-link">Sign up</a></p>
                     </div>
                 </div>
             </div>

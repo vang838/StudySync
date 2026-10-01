@@ -1,3 +1,6 @@
+"use client";
+
+import {useEffect, useState} from "react";
 import {HugeiconsIcon} from "@hugeicons/react";
 import {
     ArrowRight01Icon,
@@ -119,11 +122,33 @@ function SectionHeading({
 }
 
 export default function StudentDashboardPage() {
+    const [savedCourses, setSavedCourses] = useState(courses);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        try {
+            const raw = window.localStorage.getItem("saved_courses");
+            if (!raw) {
+                return;
+            }
+
+            const parsedCourses = JSON.parse(raw);
+            if (Array.isArray(parsedCourses) && parsedCourses.length > 0) {
+                setSavedCourses(parsedCourses);
+            }
+        } catch (error) {
+            console.warn("Unable to load saved courses from localStorage.", error);
+        }
+    }, []);
+
     const averageProgress = Math.round(
-        courses.reduce(
+        savedCourses.reduce(
             (total, course) => total + course.progress,
             0
-        ) / courses.length
+        ) / savedCourses.length
     );
 
     return (
@@ -199,7 +224,7 @@ export default function StudentDashboardPage() {
                         {[
                             {
                                 label: "Saved courses",
-                                value: String(courses.length),
+                                value: String(savedCourses.length),
                                 icon: BookOpen01Icon,
                             },
                             {
@@ -244,7 +269,7 @@ export default function StudentDashboardPage() {
                             />
 
                             <div className="grid gap-4 md:grid-cols-3">
-                                {courses.map((course) => (
+                                {savedCourses.map((course) => (
                                     <Card
                                         key={course.code}
                                         size="sm"

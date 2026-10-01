@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./auth.css";
 
@@ -24,14 +25,11 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
 
   const featuredItem = await getRandomItem();
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
+    <div className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <div className="min-h-full flex flex-col">
         <header>
           <div className="logo-container">
-            <a href="/" aria-label="StudySync home">
+            <Link href="/" aria-label="StudySync home">
               <Image
                 src="/StudySync.png"
                 alt="StudySync logo"
@@ -39,7 +37,7 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
                 height={48}
                 priority
               />
-            </a>
+            </Link>
           </div>
         </header>
         <main className="auth-main" style={{ backgroundImage: featuredItem ? `url(${featuredItem})` : 'none' }}>
@@ -66,7 +64,7 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
             <div className="footer-links">
             <div>
                 <h3>StudySync</h3>
-                <a href="/">Home</a>
+                <Link href="/">Home</Link>
                 <a href="/about">About</a>
                 <a href="/features">Features</a>
             </div>
@@ -90,7 +88,7 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
             <p>© 2026 StudySync. All rights reserved.</p>
         </div>
         </footer>
-      </body>
-    </html>
+      </div>
+    </div>
   );
 }
