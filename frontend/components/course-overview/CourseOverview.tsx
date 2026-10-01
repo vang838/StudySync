@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import CourseForumSection from "@/components/course-overview/CourseForumSection";
+import CourseMembersSection from "@/components/course-overview/CourseMembersSection";
 
 type CourseDetails = {
   course_id: string;
@@ -61,7 +62,11 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      <section className="space-y-6 lg:col-span-8">
+      <aside className="space-y-6 lg:col-span-3">
+        <CourseMembersSection courseId={courseId} />
+      </aside>
+
+      <section className="space-y-6 lg:col-span-6">
         <Card>
           <CardHeader>
             <CardTitle>{course.title}</CardTitle>
@@ -88,19 +93,8 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
         </Card>
       </section>
 
-      <aside className="space-y-6 lg:col-span-4">
+      <aside className="space-y-6 lg:col-span-3">
         <CourseForumSection courseId={courseId} />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Start Here</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Review the course description and start the first thread for this class.
-            </p>
-          </CardContent>
-        </Card>
       </aside>
     </div>
   );
