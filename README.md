@@ -193,5 +193,3 @@ Use the backend settings and frontend API base URL that the app expects.
 | `EMBEDDING_MODEL` | Backend | Embedding model used during document ingestion. |
 | `JWT_SECRET` | Backend | Signs authentication tokens or sessions if auth is enabled. |
 | `APP_ENV` | Backend | Runtime mode, such as development, staging, or production. |
-
-Pinecone is intentionally omitted here. I do not know enough about it.
