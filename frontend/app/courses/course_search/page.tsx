@@ -1,7 +1,9 @@
-"use client";
+'use client';
+
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from 'next/link';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -33,29 +35,44 @@ const normalizeCourse = (item: ApiCourse): Course => ({
 });
 
 // Function to fetch courses from the API endpoint
-const fetchCourses = async (filters: CourseSearchFilters, query: string): Promise<Course[]> => {
+const fetchCourses = async (
+    filters: CourseSearchFilters,
+    query: string,
+    savedOnly: boolean,
+    userId: number,
+): Promise<Course[]> => {
     const url = new URL('/api/courses/search', window.location.origin);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
     url.searchParams.set('subject', filters.subject);
     url.searchParams.set('courseNumber', filters.courseNumber);
     url.searchParams.set('professor', filters.professor);
     url.searchParams.set('name', query);
+    url.searchParams.set('savedOnly', savedOnly ? 'true' : 'false');
+    if (savedOnly) {
+        url.searchParams.set('user_id', String(userId));
+    }
 
-    const response = await fetch(url.toString());
-    
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    try {
+        const response = await fetch(url.toString(), { signal: controller.signal });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        // Safely check if the data is an array of courses, or if it contains a 'courses' array.
+        if (Array.isArray(data)) {
+            return (data as ApiCourse[]).map(normalizeCourse);
+        }
+        if (typeof data === 'object' && data !== null && Array.isArray(data.courses)) {
+            return (data.courses as ApiCourse[]).map(normalizeCourse);
+        }
+        // Throwing a specific error if the structure is unrecognizable
+        throw new Error("API response did not contain a recognizable array of courses.");
+    } finally {
+        window.clearTimeout(timeoutId);
     }
-    
-    const data = await response.json();
-    // Safely check if the data is an array of courses, or if it contains a 'courses' array.
-    if (Array.isArray(data)) {
-        return (data as ApiCourse[]).map(normalizeCourse);
-    }
-    if (typeof data === 'object' && data !== null && Array.isArray(data.courses)) {
-        return (data.courses as ApiCourse[]).map(normalizeCourse);
-    }
-    // Throwing a specific error if the structure is unrecognizable
-    throw new Error("API response did not contain a recognizable array of courses.");
 };
 
 export default function CourseSearchPage() {
@@ -66,26 +83,161 @@ export default function CourseSearchPage() {
         professor: '',
     });
     const [courses, setCourses] = useState<Course[]>([]);
+    const [subjectOptions, setSubjectOptions] = useState<string[]>([]);
+    const [savedCourseIds, setSavedCourseIds] = useState<string[]>([]);
+    const [savedOnlyFilter, setSavedOnlyFilter] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const hasLoadedSubjectsRef = useRef(false);
+
+    const getCurrentUserId = useCallback(() => {
+        if (typeof window === 'undefined') {
+            return 1;
+        }
+
+        const rawUserId = window.localStorage.getItem('user_id');
+        const parsedUserId = Number(rawUserId ?? '1');
+        return Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : 1;
+    }, []);
+
+    const syncSavedCourses = useCallback(async () => {
+        const userId = getCurrentUserId();
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+
+        try {
+            const response = await fetch(`/api/courses/saved?user_id=${userId}`, { signal: controller.signal });
+            if (!response.ok) {
+                return;
+            }
+
+            const savedCourses = await response.json();
+            const ids = Array.isArray(savedCourses)
+                ? savedCourses
+                    .map((course: { course_id?: string; id?: string }) => course.course_id ?? course.id)
+                    .filter((courseId): courseId is string => Boolean(courseId))
+                : [];
+            setSavedCourseIds(ids);
+        } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') {
+                setError('Loading saved courses timed out. Please try again.');
+                return;
+            }
+            console.error('Failed to load saved courses:', err);
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }, [getCurrentUserId]);
+
+    const loadSubjectOptions = useCallback(async () => {
+        if (hasLoadedSubjectsRef.current) {
+            return;
+        }
+
+        hasLoadedSubjectsRef.current = true;
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+
+        try {
+            const response = await fetch('/api/courses/subjects', { signal: controller.signal });
+            if (!response.ok) {
+                return;
+            }
+            const subjects = await response.json();
+            if (Array.isArray(subjects)) {
+                const normalized = subjects.filter(
+                    (subject): subject is string => typeof subject === 'string' && subject.trim().length > 0,
+                );
+                setSubjectOptions(normalized);
+            }
+        } catch (err) {
+            if (!(err instanceof Error && err.name === 'AbortError')) {
+                console.error('Failed to load subject options:', err);
+            }
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }, []);
 
     const handleSearch = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const results = await fetchCourses(filters, searchTerm);
+            const results = await fetchCourses(filters, searchTerm, savedOnlyFilter, getCurrentUserId());
             setCourses(results);
         } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') {
+                setError('Course search timed out. Please try again.');
+                setCourses([]);
+                return;
+            }
             console.error('Course fetch failed:', err);
             setError("Failed to fetch course data. Please try again.");
             setCourses([]);
         } finally {
             setLoading(false);
         }
-    }, [filters, searchTerm]);
+    }, [filters, getCurrentUserId, savedOnlyFilter, searchTerm]);
+
+    const handleSaveToggle = useCallback(async (courseId: string) => {
+        const userId = getCurrentUserId();
+        const isSaved = savedCourseIds.includes(courseId);
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+
+        try {
+            const response = await fetch(`/api/courses/${encodeURIComponent(courseId)}/save?user_id=${userId}`, {
+                method: isSaved ? 'DELETE' : 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Unable to ${isSaved ? 'unsave' : 'save'} course.`);
+            }
+
+            const nextSavedIds = isSaved
+                ? savedCourseIds.filter((savedCourseId) => savedCourseId !== courseId)
+                : [...savedCourseIds, courseId];
+
+            setSavedCourseIds(nextSavedIds);
+
+            if (typeof window !== 'undefined') {
+                const nextSavedCourses = courses
+                    .filter((course) => nextSavedIds.includes(course.id))
+                    .map((course) => ({
+                        code: course.courseNumber,
+                        name: course.name,
+                        progress: 100,
+                    }));
+                window.localStorage.setItem('saved_courses', JSON.stringify(nextSavedCourses));
+            }
+        } catch (err) {
+            console.error('Failed to update saved course:', err);
+            setError('Saving this course failed. Please try again.');
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }, [courses, getCurrentUserId, savedCourseIds]);
 
     useEffect(() => {
-        handleSearch();
+        void syncSavedCourses();
+    }, [syncSavedCourses]);
+
+    useEffect(() => {
+        void loadSubjectOptions();
+    }, [loadSubjectOptions]);
+
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            void handleSearch();
+        }, 250);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
     }, [handleSearch]);
 
     return (
@@ -119,9 +271,11 @@ export default function CourseSearchPage() {
                                         onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
                                     >
                                         <option value="">All Subjects</option>
-                                        <option value="Computer Science">Computer Science</option>
-                                        <option value="Data Science">Data Science</option>
-                                        <option value="Mathematics">Mathematics</option>
+                                        {subjectOptions.map((subject) => (
+                                            <option key={subject} value={subject}>
+                                                {subject}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
 
@@ -143,6 +297,22 @@ export default function CourseSearchPage() {
                                         onChange={(e) => setFilters((prev) => ({ ...prev, professor: e.target.value }))}
                                         placeholder="Reed"
                                     />
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-1">
+                                    <input
+                                        id="saved-only-filter"
+                                        type="checkbox"
+                                        className="h-4 w-4 rounded border border-input"
+                                        checked={savedOnlyFilter}
+                                        onChange={(e) => setSavedOnlyFilter(e.target.checked)}
+                                    />
+                                    <label
+                                        htmlFor="saved-only-filter"
+                                        className="text-sm font-medium text-muted-foreground"
+                                    >
+                                        Saved courses only
+                                    </label>
                                 </div>
                             </CardContent>
                             <CardFooter>
@@ -192,24 +362,40 @@ export default function CourseSearchPage() {
 
                                 {!loading && !error && courses.length > 0 && (
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                        {courses.map((course) => (
-                                            <Link key={course.id} href={`/courses/${course.id}`} className="block">
-                                                <Card className="transition hover:ring-2 hover:ring-primary/40">
-                                                    <CardHeader>
-                                                        <CardTitle>{course.name}</CardTitle>
-                                                        <CardDescription>{course.subject}</CardDescription>
-                                                    </CardHeader>
-                                                    <CardContent className="space-y-1 text-sm text-muted-foreground">
-                                                        <p>Course Number: {course.courseNumber}</p>
-                                                        <p>Professor: {course.professor}</p>
-                                                        <p>Year: {course.year}</p>
-                                                    </CardContent>
-                                                    <CardFooter>
-                                                        <Button variant="secondary" size="s">Open Overview</Button>
-                                                    </CardFooter>
-                                                </Card>
-                                            </Link>
-                                        ))}
+                                        {courses.map((course) => {
+                                            const isSaved = savedCourseIds.includes(course.id);
+
+                                            return (
+                                                <div key={course.id} className="space-y-3">
+                                                    <Link href={`/courses/${course.id}`} className="block">
+                                                        <Card className="transition hover:ring-2 hover:ring-primary/40">
+                                                            <CardHeader>
+                                                                <CardTitle>{course.name}</CardTitle>
+                                                                <CardDescription>{course.subject}</CardDescription>
+                                                            </CardHeader>
+                                                            <CardContent className="space-y-1 text-sm text-muted-foreground">
+                                                                <p>Course Number: {course.courseNumber}</p>
+                                                                <p>Professor: {course.professor}</p>
+                                                                <p>Year: {course.year}</p>
+                                                            </CardContent>
+                                                            <CardFooter>
+                                                                <Button variant="secondary" size="s">Open Overview</Button>
+                                                            </CardFooter>
+                                                        </Card>
+                                                    </Link>
+                                                    <Button
+                                                        type="button"
+                                                        variant={isSaved ? 'default' : 'outline'}
+                                                        className="w-full"
+                                                        onClick={() => {
+                                                            void handleSaveToggle(course.id);
+                                                        }}
+                                                    >
+                                                        {isSaved ? 'Saved' : 'Save course'}
+                                                    </Button>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </CardContent>

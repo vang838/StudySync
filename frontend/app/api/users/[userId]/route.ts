@@ -1,35 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> },
+) {
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
   const incomingUrl = new URL(request.url);
+  const { userId } = await params;
+  const targetUrl = new URL(`/api/v1/users/${encodeURIComponent(userId)}`, backendBaseUrl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  const targetUrl = new URL('/api/v1/courses/search', backendBaseUrl);
-  targetUrl.searchParams.set('subject', incomingUrl.searchParams.get('subject') ?? '');
-  targetUrl.searchParams.set('courseNumber', incomingUrl.searchParams.get('courseNumber') ?? '');
-  targetUrl.searchParams.set('name', incomingUrl.searchParams.get('name') ?? '');
-  targetUrl.searchParams.set('professor', incomingUrl.searchParams.get('professor') ?? '');
-  targetUrl.searchParams.set('savedOnly', incomingUrl.searchParams.get('savedOnly') ?? 'false');
-
-  const userId = incomingUrl.searchParams.get('user_id');
-  if (userId) {
-    targetUrl.searchParams.set('user_id', userId);
-  }
+  incomingUrl.searchParams.forEach((value, key) => {
+    targetUrl.searchParams.set(key, value);
+  });
 
   try {
     const response = await fetch(targetUrl.toString(), {
       method: 'GET',
       headers: {
-        Accept: 'application/json',
+        accept: 'application/json',
       },
       signal: controller.signal,
       cache: 'no-store',
     });
 
     const text = await response.text();
-
     return new NextResponse(text, {
       status: response.status,
       headers: {
@@ -38,7 +34,7 @@ export async function GET(request: NextRequest) {
     });
   } catch {
     return NextResponse.json(
-      { detail: 'Unable to reach backend courses service.' },
+      { detail: 'Unable to reach backend users service.' },
       { status: 502 },
     );
   } finally {

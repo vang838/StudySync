@@ -1,15 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import React, { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import CourseForumSection from "@/components/course-overview/CourseForumSection";
+import CourseMembersSection from "@/components/course-overview/CourseMembersSection";
 
 type CourseDetails = {
   course_id: string;
@@ -43,14 +38,14 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
         const data = (await response.json()) as CourseDetails;
         setCourse(data);
       } catch (loadError) {
-        const message = loadError instanceof Error ? loadError.message : 'Unable to load course details.';
+        const message = loadError instanceof Error ? loadError.message : "Unable to load course details.";
         setError(message);
       } finally {
         setLoading(false);
       }
     };
 
-    loadCourse();
+    void loadCourse();
   }, [courseId]);
 
   if (loading) {
@@ -67,18 +62,22 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      <section className="space-y-6 lg:col-span-8">
+      <aside className="space-y-6 lg:col-span-3">
+        <CourseMembersSection courseId={courseId} />
+      </aside>
+
+      <section className="space-y-6 lg:col-span-6">
         <Card>
           <CardHeader>
             <CardTitle>{course.title}</CardTitle>
             <CardDescription>{course.course_id} · {course.subject} · {course.year}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>{course.description || 'No description provided for this course yet.'}</p>
+            <p>{course.description || "No description provided for this course yet."}</p>
             <Separator />
             <div>
               <p className="text-xs font-medium tracking-wide text-muted-foreground">Professor</p>
-              <p className="mt-1 text-base text-foreground">{course.professor || 'TBA'}</p>
+              <p className="mt-1 text-base text-foreground">{course.professor || "TBA"}</p>
             </div>
           </CardContent>
         </Card>
@@ -94,35 +93,11 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
         </Card>
       </section>
 
-      <aside className="space-y-6 lg:col-span-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Discussion Forum</CardTitle>
-            <CardDescription>Talk through homework, readings, and exam prep.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground">
-              No discussion threads yet.
-            </div>
-          </CardContent>
-          <CardContent>
-            <Button className="w-full">View All Threads</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Start Here</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Review the course description and start the first thread for this class.
-            </p>
-          </CardContent>
-        </Card>
+      <aside className="space-y-6 lg:col-span-3">
+        <CourseForumSection courseId={courseId} />
       </aside>
     </div>
   );
-}
+};
 
 export default CourseOverview;

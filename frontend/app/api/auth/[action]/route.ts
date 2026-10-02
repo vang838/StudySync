@@ -1,32 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(
+const ALLOWED_AUTH_ACTIONS = new Set([
+  'signup',
+  'login',
+  'forgotpassword',
+  'resetpassword',
+  'logout',
+]);
+
+export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ courseId: string }> },
+  { params }: { params: Promise<{ action: string }> },
 ) {
+  const { action } = await params;
+  if (!ALLOWED_AUTH_ACTIONS.has(action)) {
+    return NextResponse.json({ detail: 'Unsupported auth action.' }, { status: 404 });
+  }
+
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
-  const incomingUrl = new URL(request.url);
-  const { courseId } = await params;
-  const targetUrl = new URL(`/api/v1/courses/${encodeURIComponent(courseId)}`, backendBaseUrl);
+  const targetUrl = new URL(`/api/v1/auth/${action}`, backendBaseUrl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  incomingUrl.searchParams.forEach((value, key) => {
-    targetUrl.searchParams.set(key, value);
-  });
-
   try {
+    const payload = await request.text();
     const response = await fetch(targetUrl.toString(), {
-      method: 'GET',
+      method: 'POST',
       headers: {
+        'content-type': request.headers.get('content-type') ?? 'application/json',
         accept: 'application/json',
       },
+      body: payload,
       signal: controller.signal,
       cache: 'no-store',
     });
 
     const text = await response.text();
-
     return new NextResponse(text, {
       status: response.status,
       headers: {
@@ -35,7 +44,7 @@ export async function GET(
     });
   } catch {
     return NextResponse.json(
-      { detail: 'Unable to reach backend courses service.' },
+      { detail: 'Unable to reach backend auth service.' },
       { status: 502 },
     );
   } finally {
