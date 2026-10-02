@@ -7,6 +7,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import StudyTaskEditor from "./StudyTaskEditor";
+import {useStudyTasks} from "./StudyTasksProvider";
 
 function startOfWeek(date: Date) {
     const monday = new Date(date);
@@ -19,9 +21,17 @@ function sameDay(first: Date, second: Date) {
     return first.toDateString() === second.toDateString();
 }
 
+function dateKey(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
 export default function StudyCalendar() {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const dialogRef = useRef<HTMLDialogElement>(null);
+    const {tasks} = useStudyTasks();
 
     useEffect(() => {
         setSelectedDate(new Date());
@@ -144,6 +154,9 @@ export default function StudyCalendar() {
                     <div className="grid grid-cols-7 gap-1 text-center">
                         {weekDays.map((date) => {
                             const isSelected = sameDay(date, selectedDate);
+                            const dayTasks = tasks.filter(
+                                (task) => task.dueDate === dateKey(date)
+                            );
 
                             return (
                                 <button
@@ -163,6 +176,15 @@ export default function StudyCalendar() {
                     })}
                   </span>
                                     <span className="mt-1 font-semibold">{date.getDate()}</span>
+                                    {dayTasks.length > 0 && (
+                                        <span
+                                            className="mt-1 min-w-4 rounded-full bg-background px-1 text-[10px] text-foreground"
+                                            title={dayTasks.map((task) => task.title).join(", ")}
+                                        >
+                                             {dayTasks.length}
+                                             </span>
+                                    )}
+
                                 </button>
                             );
                         })}
@@ -237,6 +259,9 @@ export default function StudyCalendar() {
                         const isSelected = sameDay(date, selectedDate);
                         const isOutsideMonth =
                             date.getMonth() !== selectedDate.getMonth();
+                        const dayTasks = tasks.filter(
+                            (task) => task.dueDate === dateKey(date)
+                        );
 
                         return (
                             <button
@@ -249,10 +274,7 @@ export default function StudyCalendar() {
                                     year: "numeric",
                                 })}
                                 aria-pressed={isSelected}
-                                onClick={() => {
-                                    setSelectedDate(date);
-                                    dialogRef.current?.close();
-                                }}
+                                onClick={() => setSelectedDate(date)}
                                 className={`flex h-16 items-start rounded-lg border border-foreground/10 p-2 text-left text-sm transition-colors sm:h-24 ${
                                     isSelected
                                         ? "bg-secondary text-secondary-foreground hover:bg-secondary"
@@ -261,10 +283,21 @@ export default function StudyCalendar() {
                                             : "text-foreground hover:bg-muted"
                                 }`}
                             >
-                                {date.getDate()}
+                                <span className="font-semibold">{date.getDate()}</span>
+                                {dayTasks.length > 0 && (
+                                    <span
+                                        className="mt-1 max-w-full truncate rounded bg-background px-1.5 text-[10px] text-foreground">
+                                          {dayTasks.length === 1
+                                              ? dayTasks[0].title
+                                              : `${dayTasks.length} tasks`}
+                                         </span>
+                                )}
                             </button>
                         );
                     })}
+                </div>
+                <div className="mt-6">
+                    <StudyTaskEditor date={selectedDate}/>
                 </div>
             </dialog>
         </>
