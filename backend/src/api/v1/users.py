@@ -25,3 +25,5 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)) -> dict:
         "created_at": user.created_at,
         "updated_at": user.updated_at,
     }
+
+
