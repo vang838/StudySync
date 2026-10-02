@@ -86,10 +86,43 @@ class Course(Base):
         secondary="course_members",
         back_populates="saved_courses",
     )
+
     forum_posts: Mapped[list["CourseForumPost"]] = relationship(
         "CourseForumPost",
         back_populates="course",
         cascade="all, delete-orphan",
+    )
+
+
+class ProfessorReview(Base):
+    __tablename__ = "professor_reviews"
+
+    review_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+
+    professor: Mapped[str] = mapped_column(
+        String(200), index=True, nullable=False
+    )
+
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.course_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    rating: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )
+
+    feedback: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
     )
 
 
@@ -101,21 +134,54 @@ class UserCourseSave(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), index=True, nullable=False)
-    course_id: Mapped[str] = mapped_column(ForeignKey("courses.course_id", ondelete="CASCADE"), index=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.course_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
 
 
 class CourseForumPost(Base):
     __tablename__ = "course_forum_posts"
 
     post_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    course_id: Mapped[str] = mapped_column(ForeignKey("courses.course_id", ondelete="CASCADE"), index=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), index=True, nullable=False)
-    parent_post_id: Mapped[int | None] = mapped_column(ForeignKey("course_forum_posts.post_id", ondelete="CASCADE"), index=True, nullable=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.course_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    parent_post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
 
     course: Mapped["Course"] = relationship(back_populates="forum_posts")
     author: Mapped["User"] = relationship(back_populates="forum_posts")
@@ -130,8 +196,7 @@ class CourseForumPost(Base):
         cascade="all, delete-orphan",
         single_parent=True,
     )
-
-
+      
 class DocumentRecord(Base):
     __tablename__ = "documents"
 

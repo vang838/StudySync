@@ -45,7 +45,7 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     """Initializes the database by creating tables and seeding initial data."""
-    from src.db.models import Course # Import Course model here for seeding
+    from src.db.models import Course, ProfessorReview # Import Course model here for seeding
 
     # 1. Create all tables if they do not exist
     engine = get_engine()
@@ -106,3 +106,33 @@ def init_db() -> None:
                 print(f"Updated professor data for {updated} existing courses.")
             else:
                 print("Database already contains course records. Skipping seed data insertion.")
+
+        # Seed initial professor review data
+        review_count = session.query(ProfessorReview).count()
+
+        if review_count == 0:
+            print("Seeding initial professor review data...")
+            reviews_to_seed = [
+                ProfessorReview(
+                    professor="Dr. Evelyn Reed, Ph.D.",
+                    course_id="cs101",
+                    rating=5,
+                    feedback="Explains concepts clearly and is very helpful during class.",
+                ),
+                ProfessorReview(
+                    professor="Dr. Evelyn Reed, Ph.D.",
+                    course_id="cs101",
+                    rating=4,
+                    feedback="Good professor overall. The assignments can be challenging.",
+                ),
+                ProfessorReview(
+                    professor="Dr. Amina Patel, Ph.D.",
+                    course_id="ma205",
+                    rating=5,
+                    feedback="Very knowledgeable and explains difficult topics well.",
+                ),
+            ]
+
+            session.add_all(reviews_to_seed)
+            session.commit()
+            print(f"Successfully seeded {len(reviews_to_seed)} professor reviews.")
