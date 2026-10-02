@@ -15,6 +15,8 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import StudyCalendar from "@/components/dashboard/StudyCalendar";
+import UpcomingStudyTasks from "@/components/dashboard/UpcomingStudyTasks";
+
 
 const courses = [
     {code: "BIO 201", name: "Human Biology", progress: 72},
@@ -323,38 +325,7 @@ export default function StudentDashboardPage() {
                                 eyebrow="Coming up"
                                 title="Upcoming study tasks"
                             />
-
-                            <Card className="gap-0">
-                                <CardContent className="divide-y divide-foreground/10">
-                                    {tasks.map((task) => (
-                                        <div
-                                            key={task.title}
-                                            className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                                        >
-                      <span
-                          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-secondary">
-                        <HugeiconsIcon
-                            icon={CheckmarkCircle01Icon}
-                            size={18}
-                        />
-                      </span>
-
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-medium">
-                                                    {task.title}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {task.course}
-                                                </p>
-                                            </div>
-
-                                            <span className="shrink-0 text-xs font-medium">
-                        {task.due}
-                      </span>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
+                            <UpcomingStudyTasks/>
                         </section>
                     </div>
 
