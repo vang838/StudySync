@@ -14,13 +14,20 @@ class Settings(BaseSettings):
     pinecone_api_key: str = Field(default="", alias="PINECONE_API_KEY")
     pinecone_index_name: str = Field(default="", alias="PINECONE_INDEX_NAME")
     pinecone_namespace: str = Field(default="", alias="PINECONE_NAMESPACE")
+    pinecone_batch_size: int = Field(default=50,gt=0,le=1000,alias="PINECONE_BATCH_SIZE")
 
     ai_base_url: str = Field(default="http://127.0.0.1:11434", alias="AI_BASE_URL")
     ai_provider: str = Field(default="ollama", alias="AI_PROVIDER")
     ai_model: str = Field(default="qwen3:14b", alias="AI_MODEL")
     ai_timeout: float = Field(default=120.0,gt=0,alias="AI_TIMEOUT")
 
-    embedding_model: str = Field(default="", alias="EMBEDDING_MODEL")
+    embedding_provider: str = Field(default="ollama", alias="EMBEDDING_PROVIDER")
+    embedding_base_url: str = Field(default="http://127.0.0.1:11434", alias="EMBEDDING_BASE_URL")
+    embedding_model: str = Field(default="qwen3-embedding:0.6b", alias="EMBEDDING_MODEL")
+    embedding_dimension: int = Field(default=1024, gt=0, alias="EMBEDDING_DIMENSION")
+    embedding_timeout: float = Field(default=120.0, gt=0, alias="EMBEDDING_TIMEOUT")
+    embedding_batch_size: int = Field(default=32,gt=0,alias="EMBEDDING_BATCH_SIZE")
+
     jwt_secret: str = Field(default="", alias="JWT_SECRET")
 
     r2_endpoint_url: str | None = Field(default=None, alias="R2_ENDPOINT_URL")
