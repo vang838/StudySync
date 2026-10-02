@@ -40,13 +40,9 @@ export default function ProfessorReviewsPage() {
             setError(null);
 
             try {
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE_URL ??
-                    "http://127.0.0.1:8000";
-
                 const url = new URL(
-                    "/api/v1/professor-reviews",
-                    apiBase
+                    "/api/professor-reviews",
+                    window.location.origin
                 );
 
                 url.searchParams.set("professor", professorName);

@@ -12,6 +12,11 @@ import {
 export default function Header() {
 
  async function logout() {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("user_id");
+      window.localStorage.removeItem("studysync_user");
+    }
+
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.replace("/auth/signin");
   }
@@ -52,6 +57,18 @@ export default function Header() {
                 <NavigationMenuItem>
                     <NavigationMenuLink href="/courses/course_search" className="py-2 text-sm text-foreground">
                         Course Search
+                    </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <NavigationMenuItem>
+                    <NavigationMenuLink href="/professors" className="py-2 text-sm text-foreground">
+                        Professor Search
+                    </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <NavigationMenuItem>
+                    <NavigationMenuLink href="/collaborative-hub" className="py-2 text-sm text-foreground">
+                        Collaborative Hub
                     </NavigationMenuLink>
                 </NavigationMenuItem>
             </NavigationMenuList>

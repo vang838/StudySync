@@ -37,6 +37,16 @@ export default function SignIn() {
                 return;
             }
 
+            const user = data.user ?? {};
+            if (typeof window !== "undefined") {
+                if (user.user_id != null) {
+                    window.localStorage.setItem("user_id", String(user.user_id));
+                }
+                if (user && Object.keys(user).length > 0) {
+                    window.localStorage.setItem("studysync_user", JSON.stringify(user));
+                }
+            }
+
             router.push("/dashboard");
             router.refresh();
         } catch {

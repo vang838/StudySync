@@ -23,17 +23,26 @@ export default function CollaborativeHub() {
   useEffect(() => {
     async function loadSavedCourses() {
       try {
-        const rawUser = localStorage.getItem("studysync_user");
-
-        if (!rawUser) {
-            throw new Error("User is not logged in.");
+        if (typeof window === "undefined") {
+          throw new Error("User is not logged in.");
         }
 
-        const user = JSON.parse(rawUser);
-        const userId = Number(user.user_id);
+        const rawUserId = window.localStorage.getItem("user_id");
+        let userId: number | null = rawUserId ? Number(rawUserId) : null;
+
+        if (!userId || !Number.isInteger(userId) || userId <= 0) {
+          const rawUser = window.localStorage.getItem("studysync_user");
+
+          if (!rawUser) {
+            throw new Error("User is not logged in.");
+          }
+
+          const parsedUser = JSON.parse(rawUser);
+          userId = Number(parsedUser.user_id);
+        }
 
         if (!Number.isInteger(userId) || userId <= 0) {
-            throw new Error("Invalid user ID.");
+          throw new Error("Invalid user ID.");
         }
 
         const response = await fetch(
@@ -53,7 +62,11 @@ export default function CollaborativeHub() {
         setCourses(data);
       } catch (err) {
         console.error(err);
-        setError("Unable to load your saved courses.");
+        setError(
+          err instanceof Error && err.message === "User is not logged in."
+            ? "Please sign in to view your saved courses."
+            : "Unable to load your saved courses."
+        );
       } finally {
         setLoading(false);
       }

@@ -33,6 +33,33 @@ export default function ProfessorSearchPage() {
     const [error, setError] = useState<string | null>(null);
     const [searched, setSearched] = useState(false);
 
+    async function fetchProfessorCourses(
+        professorName: string
+    ): Promise<CourseResult[]> {
+        const proxyUrl = new URL("/api/courses/search", window.location.origin);
+        proxyUrl.searchParams.set("professor", professorName);
+        const response = await fetch(proxyUrl.toString());
+        const responseBody = await response
+            .json()
+            .catch(() => null);
+
+        if (!response.ok) {
+            const detail =
+                responseBody &&
+                typeof responseBody === "object" &&
+                "detail" in responseBody
+                    ? String(responseBody.detail)
+                    : `HTTP ${response.status}`;
+            throw new Error(detail);
+        }
+
+        if (Array.isArray(responseBody)) {
+            return responseBody as CourseResult[];
+        }
+
+        throw new Error("Invalid response format");
+    }
+
     async function handleSearch() {
         const professorName = searchTerm.trim();
 
@@ -47,16 +74,7 @@ export default function ProfessorSearchPage() {
         setSearched(true);
 
         try {
-            const url = new URL("/api/courses/search", window.location.origin);
-            url.searchParams.set("professor", professorName);
-
-            const response = await fetch(url.toString());
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data: CourseResult[] = await response.json();
+            const data = await fetchProfessorCourses(professorName);
 
             const professorMap = new Map<string, CourseResult[]>();
 
