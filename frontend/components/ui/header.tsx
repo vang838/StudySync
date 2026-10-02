@@ -83,8 +83,8 @@ const [userId, setUserId] = useState<number | null>(null);
                 </NavigationMenuItem>
         
                 <NavigationMenuItem>
-                    <NavigationMenuLink href="#resources" className="py-2 text-sm text-foreground">
-                        Hi, {greeting}
+                    <NavigationMenuLink href="/professors/professor_search" className="py-2 text-sm text-foreground">
+                        Professor Search
                     </NavigationMenuLink>
                 </NavigationMenuItem>
 

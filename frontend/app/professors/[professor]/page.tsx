@@ -139,7 +139,7 @@ export default function ProfessorReviewsPage() {
                 <Separator />
 
                 <div>
-                    <Link href="/professors">
+                    <Link href="/professors/professor_search">
                         <Button variant="outline">
                             Back to Professor Search
                         </Button>
