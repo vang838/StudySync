@@ -1,6 +1,6 @@
 import httpx
 
-from ollama import Client, ResponseError, ResponseError
+from ollama import Client, ResponseError
 
 from src.ports.llm import (
     LLMResponseError,
