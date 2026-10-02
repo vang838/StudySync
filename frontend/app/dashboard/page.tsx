@@ -11,10 +11,10 @@ import {
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import StudyCalendar from "@/components/dashboard/StudyCalendar";
 
 const courses = [
     {code: "BIO 201", name: "Human Biology", progress: 72},
@@ -89,15 +89,6 @@ const quickActions = [
     },
 ];
 
-const week = [
-    {day: "Mon", date: 21, activity: ""},
-    {day: "Tue", date: 22, activity: "Notes uploaded"},
-    {day: "Wed", date: 23, activity: ""},
-    {day: "Thu", date: 24, activity: ""},
-    {day: "Fri", date: 25, activity: "Biology review"},
-    {day: "Sat", date: 26, activity: ""},
-    {day: "Sun", date: 27, activity: "Math practice"},
-];
 
 function SectionHeading({
                             eyebrow,
@@ -371,60 +362,12 @@ export default function StudentDashboardPage() {
                         id="planner"
                         className="min-w-0 scroll-mt-5"
                     >
+
                         <SectionHeading
                             eyebrow="Your schedule"
                             title="Planner / calendar"
                         />
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Sep 21–27, 2026</CardTitle>
-                                <CardDescription>
-                                    Sample week
-                                </CardDescription>
-                            </CardHeader>
-
-                            <CardContent className="overflow-x-auto">
-                                <div className="grid min-w-[260px] grid-cols-7 gap-1 text-center">
-                                    {week.map((day) => (
-                                        <div
-                                            key={day.day}
-                                            className="flex flex-col items-center gap-2"
-                                        >
-                      <span className="text-xs text-muted-foreground">
-                        {day.day}
-                      </span>
-                                            <span
-                                                className={
-                                                    "flex size-8 items-center justify-center rounded-full text-xs font-medium " +
-                                                    (day.activity
-                                                        ? "bg-secondary text-secondary-foreground"
-                                                        : "bg-background")
-                                                }
-                                            >
-                        {day.date}
-                      </span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-5 space-y-2 border-t border-foreground/10 pt-4">
-                                    {week
-                                        .filter((day) => day.activity)
-                                        .map((day) => (
-                                            <p
-                                                key={day.date}
-                                                className="flex justify-between gap-3 text-xs"
-                                            >
-                                                <span>{day.activity}</span>
-                                                <span className="text-muted-foreground">
-                          Sep {day.date}
-                        </span>
-                                            </p>
-                                        ))}
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <StudyCalendar/>
                     </section>
                 </div>
             </div>
