@@ -8,6 +8,7 @@ dependencies = [
     "boto3>=1.43.102",
     "fastapi[standard]==0.141.1",
     "httpx>=0.28.1",
+    "llama-index-core==0.14.25",
     "ollama>=0.6.2",
     "pinecone>=10.0.0",
     "psycopg[binary]>=3.3.5",

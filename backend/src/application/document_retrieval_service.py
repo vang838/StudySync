@@ -33,46 +33,63 @@ class DocumentRetrievalService:
         self._embedding_port = embedding_port
         self._vector_store = vector_store
 
-    def retrieve(
-        self,
-        *,
-        query: str,
-        course_id: str,
-        top_k: int = 5,
-    ) -> list[RetrievedChunk]:
+    def retrieve(self, *, query: str, course_id: str, document_ids: list[str] | None = None, top_k: int = 5) -> list[RetrievedChunk]:
         query = query.strip()
         course_id = course_id.strip()
 
         if not query:
-            raise DocumentRetrievalError(
-                "Retrieval query must not be empty"
-            )
+            raise DocumentRetrievalError("Retrieval query must not be empty")
 
         if not course_id:
             raise DocumentRetrievalError(
-                "course_id must not be empty"
-            )
+            "course_id must not be empty")
 
         if top_k <= 0:
-            raise DocumentRetrievalError(
-                "top_k must be greater than zero"
-            )
+            raise DocumentRetrievalError("top_k must be greater than zero")
+
+        normalized_document_ids: list[str] | None = None
+
+        if document_ids is not None:
+            normalized_document_ids = [
+                document_id.strip()
+                for document_id in document_ids
+                if document_id.strip()
+            ]
+
+            if not normalized_document_ids:
+                raise DocumentRetrievalError("document_ids must contain at least one non-empty document ID")
+
+            normalized_document_ids = list(dict.fromkeys(normalized_document_ids))
 
         query_vector = self._embedding_port.embed_query(query)
 
-        matches = self._vector_store.search(
-            query_vector=query_vector,
-            top_k=top_k,
-            metadata_filter={
-                "course_id": {
-                    "$eq": course_id,
-                }
-            },
-        )
+        metadata_filter: dict[str, object] = {
+            "course_id": {
+                "$eq": course_id,
+            }
+        }
+
+        if normalized_document_ids is not None:
+            metadata_filter = {
+                "$and": [
+                    {
+                        "course_id": {
+                            "$eq": course_id,
+                        }
+                    },
+                    {
+                        "document_id": {
+                            "$in": normalized_document_ids,
+                        }
+                    },
+                ]
+            }
+
+        matches = self._vector_store.search(query_vector=query_vector, top_k=top_k, metadata_filter=metadata_filter)
 
         if not matches:
             return []
-
+        
         chunk_ids = [
             match.record_id
             for match in matches
@@ -80,9 +97,7 @@ class DocumentRetrievalService:
 
         chunks = list(
             self._db.scalars(
-                select(DocumentChunkRecord).where(
-                    DocumentChunkRecord.chunk_id.in_(chunk_ids)
-                )
+                select(DocumentChunkRecord).where(DocumentChunkRecord.chunk_id.in_(chunk_ids))
             )
         )
 
@@ -100,12 +115,7 @@ class DocumentRetrievalService:
                 continue
 
             results.append(
-                RetrievedChunk(
-                    chunk_id=chunk.chunk_id,
-                    text=chunk.text,
-                    score=match.score,
-                    metadata=match.metadata,
-                )
+                RetrievedChunk(chunk_id=chunk.chunk_id, text=chunk.text, score=match.score, metadata=match.metadata)
             )
 
         return results

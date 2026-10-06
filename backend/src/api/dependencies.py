@@ -9,7 +9,7 @@ from src.adapters.embedding.ollama import OllamaEmbeddingAdapter
 
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
 
-from src.application.chat_service import ChatService
+from src.application.rag_service import RAGService
 from src.application.document_ingestion_service import DocumentIngestionService
 from src.application.docs_upload import DocumentUploadInspector
 from src.application.document_extraction_service import DocumentExtractionService
@@ -38,16 +38,6 @@ from src.ports.embedding import EmbeddingPort
 from src.ports.vector_store import VectorStorePort
 
 import boto3
-
-def get_chat_service() -> Generator[ChatService, None, None]:
-    """Create configured AI service"""
-    if settings.ai_provider != "ollama":
-        raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
-
-    with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
-        llm = OllamaAdapter(client=client, model=settings.ai_model)
-
-        yield ChatService(llm=llm)
 
 def get_embedding_port() -> Generator[EmbeddingPort, None, None]:
     """Create configured embedding provider."""
@@ -140,3 +130,11 @@ def get_document_vector_indexing_service(db: Session = Depends(get_db), embeddin
 
 def get_document_retrieval_service(db: Session = Depends(get_db), embedding_port: EmbeddingPort = Depends(get_embedding_port), vector_store: VectorStorePort = Depends(get_vector_store),) -> DocumentRetrievalService:
     return DocumentRetrievalService(db=db, embedding_port=embedding_port, vector_store=vector_store)
+
+def get_rag_service(retrieval_service: DocumentRetrievalService = Depends(get_document_retrieval_service)) -> Generator[RAGService, None, None]:
+    if settings.ai_provider != "ollama":
+        raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
+
+    with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
+        llm = OllamaAdapter(client=client, model=settings.ai_model)
+        yield RAGService(retrieval_service=retrieval_service, llm=llm)

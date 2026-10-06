@@ -149,3 +149,67 @@ class TestDocumentRetrievalService(TestCase):
 
         self.embedding_port.embed_query.assert_not_called()
         self.vector_store.search.assert_not_called()
+    
+    def test_filters_by_course_and_document_ids(self):
+        self.embedding_port.embed_query.return_value = [
+            0.1,
+            0.2,
+            0.3,
+        ]
+
+        self.vector_store.search.return_value = []
+
+        results = self.service.retrieve(
+            query="What is TCP?",
+            course_id="cs101",
+            document_ids=[
+                " doc-1 ",
+                "",
+                "doc-2",
+                "doc-1",
+            ],
+            top_k=5,
+        )
+
+        self.embedding_port.embed_query.assert_called_once_with(
+            "What is TCP?"
+        )
+
+        self.vector_store.search.assert_called_once_with(
+            query_vector=[0.1, 0.2, 0.3],
+            top_k=5,
+            metadata_filter={
+                "$and": [
+                    {
+                        "course_id": {
+                            "$eq": "cs101",
+                        }
+                    },
+                    {
+                        "document_id": {
+                            "$in": [
+                                "doc-1",
+                                "doc-2",
+                            ],
+                        }
+                    },
+                ]
+            },
+        )
+
+        self.assertEqual(results, [])
+
+
+    def test_rejects_empty_document_ids(self):
+        with self.assertRaises(DocumentRetrievalError):
+            self.service.retrieve(
+                query="What is TCP?",
+                course_id="cs101",
+                document_ids=[
+                    "",
+                    "   ",
+                ],
+            )
+
+        self.embedding_port.embed_query.assert_not_called()
+        self.vector_store.search.assert_not_called()
