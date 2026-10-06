@@ -7,23 +7,24 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.main import app
-from src.api.dependencies import get_chat_service
-from src.application.chat_service import ChatService
+from src.api.dependencies import get_rag_service
 from src.db.base import Base
 from src.db.models import ChatThreadRecord
 from src.db.session import get_db
 from src.ports.llm import LLMUnavailableError
 
 
-class FakeLLM:
+class FakeRAGService:
     def __init__(self):
         self.fail = False
+        self.calls = []
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, *, question: str, course_id: str, document_ids: list[str] | None = None, top_k: int = 5) -> str:
         if self.fail:
             raise LLMUnavailableError("Test connection failure")
 
-        return f"Generated answer: {prompt}"
+        self.calls.append((question, course_id))
+        return f"Generated answer: {question}"
 
 
 class TestChatAPI(unittest.TestCase):
@@ -42,19 +43,16 @@ class TestChatAPI(unittest.TestCase):
             expire_on_commit=False,
         )
 
-        self.fake_llm = FakeLLM()
+        self.fake_rag_service = FakeRAGService()
 
         def override_db():
             with self.session_factory() as db:
                 yield db
 
-        def override_chat_service():
-            return ChatService(self.fake_llm)
+        def override_rag_service():
+            return self.fake_rag_service
 
-        app.dependency_overrides[get_db] = override_db
-        app.dependency_overrides[get_chat_service] = (
-            override_chat_service
-        )
+        app.dependency_overrides[get_rag_service] = override_rag_service
 
         self.client = TestClient(app)
 
@@ -73,9 +71,13 @@ class TestChatAPI(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-
+        
+        self.assertEqual(
+            self.fake_rag_service.calls,
+            [("What is a process?", "CS537")],
+        )
+        
         data = response.json()
-
         self.assertEqual(
             data["answer"],
             "Generated answer: What is a process?",
@@ -101,7 +103,7 @@ class TestChatAPI(unittest.TestCase):
         )
 
     def test_unavailable_llm_does_not_create_chat(self):
-        self.fake_llm.fail = True
+        self.fake_rag_service.fail = True
 
         response = self.client.post(
             "/api/v1/chat",
