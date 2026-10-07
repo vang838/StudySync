@@ -47,6 +47,7 @@ export default function SignUp()
             return;
         }
 
+        localStorage.setItem("user_id", String(data.user.user_id));
         router.push("/dashboard");
         router.refresh();
         } catch {
