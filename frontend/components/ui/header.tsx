@@ -36,22 +36,22 @@ export default function Header() {
                         Overview
                     </NavigationMenuLink>
                 </NavigationMenuItem>
-        
-                <NavigationMenuItem>
-                    <NavigationMenuLink href="#sessions" className="py-2 text-sm text-foreground">
-                        Sessions
-                    </NavigationMenuLink>
-                </NavigationMenuItem>
-        
-                <NavigationMenuItem>
-                    <NavigationMenuLink href="#resources" className="py-2 text-sm text-foreground">
-                        Resources
-                    </NavigationMenuLink>
-                </NavigationMenuItem>
 
                 <NavigationMenuItem>
                     <NavigationMenuLink href="/courses/course_search" className="py-2 text-sm text-foreground">
                         Course Search
+                    </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <NavigationMenuItem>
+                    <NavigationMenuLink href="/professors" className="py-2 text-sm text-foreground">
+                        Professor Search
+                    </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <NavigationMenuItem>
+                    <NavigationMenuLink href="/collaborative-hub" className="py-2 text-sm text-foreground">
+                        Collaborative Hub
                     </NavigationMenuLink>
                 </NavigationMenuItem>
             </NavigationMenuList>
