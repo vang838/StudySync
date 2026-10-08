@@ -3,6 +3,10 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
+class UpdateUserRequest(BaseModel):
+    first_name: str = Field(min_length=1, max_length=128)
+    last_name: str = Field(min_length=1, max_length=128)
+    email: EmailStr
 
 class AuthLoginRequest(BaseModel):
     email: EmailStr
