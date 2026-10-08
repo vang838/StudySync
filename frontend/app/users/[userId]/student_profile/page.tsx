@@ -33,7 +33,6 @@ export default function UserProfilePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
-
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;

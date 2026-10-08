@@ -1,0 +1,13 @@
+import type { ReactNode } from "react";
+
+import Header from "@/components/ui/header";
+import Sidebars from "@/components/ui/authenticated_sidebar";
+
+export default function CoursesLayout({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-screen flex-col overflow-hidden">
+      <Header />
+      <Sidebars>{children}</Sidebars>
+    </div>
+  );
+}
