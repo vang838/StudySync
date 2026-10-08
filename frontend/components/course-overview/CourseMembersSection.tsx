@@ -85,7 +85,7 @@ export default function CourseMembersSection({ courseId }: CourseMembersSectionP
         {!loading && !error && filteredMembers.length > 0 && (
           <div className="space-y-3">
             {filteredMembers.map((member) => (
-              <Link key={member.user_id} href={`/users/${member.user_id}/student_profile`} className="block">
+              <Link key={member.user_id} href={`/users/${member.user_id}`} className="block">
                 <div className="rounded-md border border-border/60 bg-card p-3 transition hover:border-secondary hover:shadow-sm">
                   <div className="flex items-start gap-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-sm font-semibold text-secondary">
