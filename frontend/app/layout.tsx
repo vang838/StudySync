@@ -28,8 +28,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", figtree.variable)}
     >
       <body className="min-h-full flex flex-col">
-        {children}
-        <AssistantWidget/>
+        <div
+          className="min-w-0 flex-1"
+          style={{ marginRight: "var(--assistant-width, 0px)" }}
+        >
+          {children}
+        </div>
+
+        <AssistantWidget />
       </body>
     </html>
   );

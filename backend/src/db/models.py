@@ -46,7 +46,7 @@ class ChatThreadRecord(Base):
     __tablename__ = "chat_threads"
 
     chat_id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    course_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    course_id: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
@@ -57,7 +57,6 @@ class ChatThreadRecord(Base):
         cascade="all, delete-orphan",
         order_by="ChatMessageRecord.id",
     )
-
 
 class ChatMessageRecord(Base):
     __tablename__ = "chat_messages"
