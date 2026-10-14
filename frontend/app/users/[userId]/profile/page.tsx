@@ -93,14 +93,6 @@ export default function UserProfilePage({
             <h1 className="font-heading text-3xl font-bold">{user.full_name}</h1>
             <p className="text-sm text-muted-foreground">User ID: {resolvedUserId ?? user.user_id}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/courses/course_search">
-              <Button variant="secondary" size="s">Back to Catalog</Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button size="s">Dashboard</Button>
-            </Link>
-          </div>
         </header>
 
         <Separator />
