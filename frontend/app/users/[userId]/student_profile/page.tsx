@@ -41,6 +41,7 @@ const formatDateTime = (value: string): string => {
 };
 
 export default function StudentProfilePage({
+export default function UserProfilePage({
   params,
 }: {
   params: Promise<{ userId: string }>;
@@ -52,6 +53,9 @@ export default function StudentProfilePage({
   const [error, setError] = useState<string | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;
@@ -63,6 +67,7 @@ export default function StudentProfilePage({
         const [userResponse, coursesResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
           fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
+        fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
         ]);
 
         if (!userResponse.ok) {
@@ -112,6 +117,8 @@ export default function StudentProfilePage({
         setUser(userData);
         setSavedCourses(normalizedCourseData);
         setBookmarkedPosts(flattenedBookmarkedPosts);
+        setUser(userData);
+        setSavedCourses(Array.isArray(courseData) ? courseData : []);
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : "Unable to load profile.";
         setError(message);

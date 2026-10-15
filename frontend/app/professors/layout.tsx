@@ -9,10 +9,19 @@ export const metadata: Metadata = {
 };
 
 export default function ProfessorsLayout({ children }: { children: ReactNode }) {
+  title: "Student Dashboard | StudySync",
+};
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <Header />
       <Sidebars>{children}</Sidebars>
     </div>
   );
+}
 }

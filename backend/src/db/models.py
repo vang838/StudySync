@@ -57,6 +57,12 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    user_reviews: Mapped[list["ProfessorReview"]] = relationship(
+        "ProfessorReview",
+        back_populates="author",
+        cascade="all, delete-orphan",
+    )
+
 
 class ChatThreadRecord(Base):
     __tablename__ = "chat_threads"
@@ -112,6 +118,15 @@ class Course(Base):
 
 class ProfessorReview(Base):
     __tablename__ = "professor_reviews"
+    __table_args__ = (
+        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_professor_review_rating"),
+        UniqueConstraint(
+            "user_id",
+            "professor",
+            "course_id",
+            name="uq_professor_review_user_professor_course",
+        ),
+    )
 
     review_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
@@ -126,6 +141,14 @@ class ProfessorReview(Base):
         index=True,
         nullable=False,
     )
+
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+
+    author: Mapped["User | None"] = relationship(back_populates="user_reviews")
 
     rating: Mapped[int] = mapped_column(
         Integer, nullable=False

@@ -61,6 +61,20 @@ def init_db() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE courses ADD COLUMN professor VARCHAR(200)"))
 
+    if "professor_reviews" in table_names:
+        column_names = {column["name"] for column in inspector.get_columns("professor_reviews")}
+        if "user_id" not in column_names:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE professor_reviews ADD COLUMN user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE"))
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_professor_review_user_professor_course "
+                    "ON professor_reviews (user_id, professor, course_id)"
+                )
+            )
+
     # 2. Seed initial data for the Course table
     SessionLocal = get_session_factory()
     with SessionLocal() as session:
@@ -117,18 +131,21 @@ def init_db() -> None:
                 ProfessorReview(
                     professor="Dr. Evelyn Reed, Ph.D.",
                     course_id="cs101",
+                    user_id=None,
                     rating=5,
                     feedback="Explains concepts clearly and is very helpful during class.",
                 ),
                 ProfessorReview(
                     professor="Dr. Evelyn Reed, Ph.D.",
                     course_id="cs101",
+                    user_id=None,
                     rating=4,
                     feedback="Good professor overall. The assignments can be challenging.",
                 ),
                 ProfessorReview(
                     professor="Dr. Amina Patel, Ph.D.",
                     course_id="ma205",
+                    user_id=None,
                     rating=5,
                     feedback="Very knowledgeable and explains difficult topics well.",
                 ),
