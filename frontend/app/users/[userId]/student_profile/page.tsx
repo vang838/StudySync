@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,36 +40,29 @@ const formatDateTime = (value: string): string => {
   return parsed.toLocaleString();
 };
 
-export default function UserProfilePage({
+export default function StudentProfilePage({
   params,
 }: {
   params: Promise<{ userId: string }>;
 }) {
-  const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
   const [bookmarkedPosts, setBookmarkedPosts] = useState<BookmarkedForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
+
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;
       setResolvedUserId(userId);
-
-      const loggedInUserId = window.localStorage.getItem("user_id");
-      if (loggedInUserId && loggedInUserId === userId) {
-        router.replace(`/users/${encodeURIComponent(userId)}/profile`);
-        return;
-      }
-
       setLoading(true);
       setError(null);
 
       try {
         const [userResponse, coursesResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
-        fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
+          fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
         ]);
 
         if (!userResponse.ok) {
@@ -93,6 +85,7 @@ export default function UserProfilePage({
             ),
           ),
         );
+
         for (let index = 0; index < bookmarkResponses.length; index += 1) {
           const bookmarkResponse = bookmarkResponses[index];
           if (!bookmarkResponse.ok) {
@@ -103,6 +96,7 @@ export default function UserProfilePage({
             );
           }
         }
+
         const bookmarkPayloads = await Promise.all(bookmarkResponses.map((response) => response.json()));
         const flattenedBookmarkedPosts = (bookmarkPayloads.flatMap((payload) =>
           Array.isArray(payload) ? payload : []
@@ -127,7 +121,7 @@ export default function UserProfilePage({
     };
 
     void loadProfile();
-  }, [params, router]);
+  }, [params]);
 
   const savedCourseCount = useMemo(() => savedCourses.length, [savedCourses]);
 
