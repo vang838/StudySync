@@ -27,6 +27,7 @@ class User(Base):
     user_last_name: Mapped[str] = mapped_column(String(128), nullable=False)
     user_email: Mapped[str] = mapped_column(String(128), unique=True, index=True,nullable=False)
     password_hash: Mapped[str] = mapped_column(String(258),nullable=False)
+    forum_points_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
@@ -38,6 +39,21 @@ class User(Base):
     forum_posts: Mapped[list["CourseForumPost"]] = relationship(
         "CourseForumPost",
         back_populates="author",
+        cascade="all, delete-orphan",
+    )
+    forum_post_bookmarks: Mapped[list["CourseForumPostBookmark"]] = relationship(
+        "CourseForumPostBookmark",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    forum_post_likes: Mapped[list["CourseForumPostLike"]] = relationship(
+        "CourseForumPostLike",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    forum_point_transactions: Mapped[list["ForumPointTransaction"]] = relationship(
+        "ForumPointTransaction",
+        back_populates="user",
         cascade="all, delete-orphan",
     )
 
@@ -196,6 +212,97 @@ class CourseForumPost(Base):
         cascade="all, delete-orphan",
         single_parent=True,
     )
+    bookmarks: Mapped[list["CourseForumPostBookmark"]] = relationship(
+        "CourseForumPostBookmark",
+        back_populates="post",
+        cascade="all, delete-orphan",
+    )
+    likes: Mapped[list["CourseForumPostLike"]] = relationship(
+        "CourseForumPostLike",
+        back_populates="post",
+        cascade="all, delete-orphan",
+    )
+
+
+class CourseForumPostBookmark(Base):
+    __tablename__ = "course_forum_post_bookmarks"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "post_id", name="uq_forum_post_bookmark_user_post"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="forum_post_bookmarks")
+    post: Mapped["CourseForumPost"] = relationship(back_populates="bookmarks")
+
+
+class CourseForumPostLike(Base):
+    __tablename__ = "course_forum_post_likes"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "post_id", name="uq_forum_post_like_user_post"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="forum_post_likes")
+    post: Mapped["CourseForumPost"] = relationship(back_populates="likes")
+
+
+class ForumPointTransaction(Base):
+    __tablename__ = "forum_point_transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    delta_points: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    related_post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="forum_point_transactions")
       
 class DocumentRecord(Base):
     __tablename__ = "documents"
