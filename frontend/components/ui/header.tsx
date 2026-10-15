@@ -107,6 +107,7 @@ const [userId, setUserId] = useState<number | null>(null);
                                     <div className="absolute right-0 top-full z-50 w-48 pt-2">
                                     <Card className="w-full shadow-md" size="sm"> 
                                         <CardContent className="grid gap-0.5 p-1">
+                                            {userId !== null && <Link href={`/users/${userId}/student_profile`} className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Profile</Link>}
                                             {userId !== null && <Link href={`/users/${userId}/settings`} className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Setting</Link>}
                                             {userId !== null && <Link href={`/users/${userId}/uploads`} className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Uploads</Link>}
                                             {userId !== null && <Link href={`/users/${userId}/ratings`} className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Your Ratings</Link>}

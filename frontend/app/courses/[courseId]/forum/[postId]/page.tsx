@@ -9,9 +9,10 @@ export default async function CourseForumThreadPage({
   params: Promise<{ courseId: string; postId: string }>;
 }) {
   const { courseId, postId } = await params;
+  const normalizedCourseId = decodeURIComponent(courseId);
   const parsedPostId = Number(postId);
 
-  if (!courseId || !Number.isFinite(parsedPostId) || parsedPostId <= 0) {
+  if (!normalizedCourseId || !Number.isFinite(parsedPostId) || parsedPostId <= 0) {
     return <div>Invalid forum thread route.</div>;
   }
 
@@ -22,10 +23,10 @@ export default async function CourseForumThreadPage({
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-muted-foreground">Course Workspace</p>
             <h1 className="font-heading text-3xl font-bold">Discussion Thread</h1>
-            <p className="text-sm text-muted-foreground">Course ID: {courseId}</p>
+            <p className="text-sm text-muted-foreground">Course ID: {normalizedCourseId}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={`/courses/${encodeURIComponent(courseId)}`}>
+            <Link href={`/courses/${encodeURIComponent(normalizedCourseId)}`}>
               <Button variant="secondary" size="s">Back to Course Overview</Button>
             </Link>
             <Link href="/courses/course_search">
@@ -36,7 +37,7 @@ export default async function CourseForumThreadPage({
 
         <Separator />
 
-        <CourseForumSection courseId={courseId} focusPostId={parsedPostId} />
+        <CourseForumSection courseId={normalizedCourseId} focusPostId={parsedPostId} />
       </div>
     </main>
   );

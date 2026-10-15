@@ -4,14 +4,10 @@ import Header from "@/components/ui/header";
 import Sidebars from "@/components/ui/authenticated_sidebar";
 
 export const metadata: Metadata = {
-  title: "Student Dashboard | StudySync",
+  title: "Professor Search | StudySync",
 };
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function ProfessorsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <Header />

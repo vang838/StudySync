@@ -8,7 +8,8 @@ async function proxySaveRequest(
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
   const incomingUrl = new URL(request.url);
   const { courseId } = await params;
-  const targetUrl = new URL(`/api/v1/courses/${encodeURIComponent(courseId)}/save`, backendBaseUrl);
+  const normalizedCourseId = decodeURIComponent(courseId);
+  const targetUrl = new URL(`/api/v1/courses/${encodeURIComponent(normalizedCourseId)}/save`, backendBaseUrl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 

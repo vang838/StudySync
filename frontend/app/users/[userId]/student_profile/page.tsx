@@ -1,4 +1,5 @@
 "use client";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,11 @@ type UserProfile = {
   last_name: string;
   full_name: string;
   email: string;
+  forum_points: number;
+  forum_point_values?: {
+    post_or_reply: number;
+    like_received: number;
+  };
 };
 
 type SavedCourse = {
@@ -22,16 +28,35 @@ type SavedCourse = {
   year: number;
 };
 
-export default function UserProfilePage({
+type BookmarkedForumPost = {
+  post_id: number;
+  course_id: string;
+  author_name: string;
+  content: string;
+  created_at: string;
+  reply_count: number;
+};
+
+const formatDateTime = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+};
+
+export default function StudentProfilePage({
   params,
 }: {
   params: Promise<{ userId: string }>;
 }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<BookmarkedForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
+
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;
@@ -42,7 +67,7 @@ export default function UserProfilePage({
       try {
         const [userResponse, coursesResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
-        fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
+          fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
         ]);
 
         if (!userResponse.ok) {
@@ -57,8 +82,41 @@ export default function UserProfilePage({
 
         const userData = (await userResponse.json()) as UserProfile;
         const courseData = (await coursesResponse.json()) as SavedCourse[];
+        const normalizedCourseData = Array.isArray(courseData) ? courseData : [];
+        const bookmarkResponses = await Promise.all(
+          normalizedCourseData.map((course) =>
+            fetch(
+              `/api/courses/${encodeURIComponent(course.course_id)}/forum/posts?bookmarked_only=true&user_id=${encodeURIComponent(userId)}&sort=newest`,
+            ),
+          ),
+        );
+
+        for (let index = 0; index < bookmarkResponses.length; index += 1) {
+          const bookmarkResponse = bookmarkResponses[index];
+          if (!bookmarkResponse.ok) {
+            const body = await bookmarkResponse.json().catch(() => ({}));
+            throw new Error(
+              body?.detail
+                ?? `Failed to load bookmarked posts for ${normalizedCourseData[index]?.course_id ?? "a course"} (HTTP ${bookmarkResponse.status})`,
+            );
+          }
+        }
+
+        const bookmarkPayloads = await Promise.all(bookmarkResponses.map((response) => response.json()));
+        const flattenedBookmarkedPosts = (bookmarkPayloads.flatMap((payload) =>
+          Array.isArray(payload) ? payload : []
+        ) as BookmarkedForumPost[]).sort((a, b) => {
+          const aValue = Date.parse(a.created_at);
+          const bValue = Date.parse(b.created_at);
+          if (Number.isNaN(aValue) || Number.isNaN(bValue)) {
+            return b.post_id - a.post_id;
+          }
+          return bValue - aValue;
+        });
+
         setUser(userData);
-        setSavedCourses(Array.isArray(courseData) ? courseData : []);
+        setSavedCourses(normalizedCourseData);
+        setBookmarkedPosts(flattenedBookmarkedPosts);
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : "Unable to load profile.";
         setError(message);
@@ -92,6 +150,7 @@ export default function UserProfilePage({
             <p className="text-sm font-medium text-muted-foreground">Student Profile</p>
             <h1 className="font-heading text-3xl font-bold">{user.full_name}</h1>
             <p className="text-sm text-muted-foreground">User ID: {resolvedUserId ?? user.user_id}</p>
+            <p className="text-sm text-muted-foreground">Forum Points: {user.forum_points}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/courses/course_search">
@@ -125,6 +184,15 @@ export default function UserProfilePage({
                   <p className="text-xs font-medium tracking-wide text-muted-foreground">Saved courses</p>
                   <p className="mt-1 text-base text-foreground">{savedCourseCount}</p>
                 </div>
+                <div>
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground">Forum points balance</p>
+                  <p className="mt-1 text-base text-foreground">{user.forum_points}</p>
+                  {user.forum_point_values && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      +{user.forum_point_values.post_or_reply} per post/reply · +{user.forum_point_values.like_received} per like received
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -157,12 +225,34 @@ export default function UserProfilePage({
           <aside className="space-y-6 lg:col-span-4">
             <Card>
               <CardHeader>
-                <CardTitle>About</CardTitle>
+                <CardTitle>Bookmarked Posts</CardTitle>
+                <CardDescription>Saved discussions from your courses.</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  This profile shows the member&apos;s course activity and saved classes.
-                </p>
+                {bookmarkedPosts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No bookmarked posts yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {bookmarkedPosts.map((post) => (
+                      <Link
+                        key={`${post.course_id}-${post.post_id}`}
+                        href={`/courses/${encodeURIComponent(post.course_id)}/forum/${post.post_id}`}
+                        className="block"
+                      >
+                        <div className="rounded-md border border-border/60 bg-card p-3 transition hover:border-secondary hover:shadow-sm">
+                          <div className="mb-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">{post.course_id}</span>
+                            <span>{formatDateTime(post.created_at)}</span>
+                          </div>
+                          <p className="text-sm text-foreground">{post.content}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {post.reply_count} repl{post.reply_count === 1 ? "y" : "ies"} · {post.author_name}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </aside>

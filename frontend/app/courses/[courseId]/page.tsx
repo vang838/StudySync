@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import CourseOverview from "@/components/course-overview/CourseOverview";
+import CourseSaveToggleButton from "@/components/course-overview/CourseSaveToggleButton";
 
 export const metadata: Metadata = {
   title: "Course Overview",
@@ -15,8 +16,9 @@ export default async function CourseDetailPage({
   params: Promise<{ courseId: string }>;
 }) {
   const { courseId } = await params;
+  const normalizedCourseId = decodeURIComponent(courseId);
 
-  if (!courseId) {
+  if (!normalizedCourseId) {
     return <div>Error: Course ID not provided.</div>;
   }
 
@@ -27,12 +29,13 @@ export default async function CourseDetailPage({
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-muted-foreground">Course Workspace</p>
             <h1 className="font-heading text-3xl font-bold">Course Overview</h1>
-            <p className="text-sm text-muted-foreground">Course ID: {courseId}</p>
+            <p className="text-sm text-muted-foreground">Course ID: {normalizedCourseId}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/courses/course_search">
               <Button variant="secondary" size="s">Back to Catalog</Button>
             </Link>
+            <CourseSaveToggleButton courseId={normalizedCourseId} />
             <Link href="/courses/create">
               <Button size="s">Create Course</Button>
             </Link>
@@ -41,7 +44,7 @@ export default async function CourseDetailPage({
 
         <Separator />
 
-        <CourseOverview courseId={courseId} />
+        <CourseOverview courseId={normalizedCourseId} />
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -77,7 +78,16 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
             <Separator />
             <div>
               <p className="text-xs font-medium tracking-wide text-muted-foreground">Professor</p>
-              <p className="mt-1 text-base text-foreground">{course.professor || "TBA"}</p>
+              {course.professor ? (
+                <Link
+                  href={`/professors/${encodeURIComponent(course.professor)}`}
+                  className="mt-1 inline-block text-base text-primary underline-offset-2 hover:underline"
+                >
+                  {course.professor}
+                </Link>
+              ) : (
+                <p className="mt-1 text-base text-foreground">TBA</p>
+              )}
             </div>
           </CardContent>
         </Card>
