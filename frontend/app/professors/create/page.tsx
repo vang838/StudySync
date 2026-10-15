@@ -22,6 +22,10 @@ type Course =
     professor: string | null;
 };
 
+type CourseSearchResponse = {
+    courses?: Course[];
+};
+
 function CreateProfessorReviewForm()
 {
     const searchParams = useSearchParams();
@@ -56,6 +60,7 @@ function CreateProfessorReviewForm()
             try {
                 const url = new URL("/api/courses/search", window.location.origin);
                 url.searchParams.set("professor", professorName);
+                url.searchParams.set("per_page", "100");
                 const response = await fetch(url.toString(), {
                     signal: controller.signal,
                 });
@@ -63,8 +68,9 @@ function CreateProfessorReviewForm()
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const data: Course[] = await response.json();
-                const matchingCourses = data.filter(
+                const payload: Course[] | CourseSearchResponse = await response.json();
+                const courses = Array.isArray(payload) ? payload : payload.courses ?? [];
+                const matchingCourses = courses.filter(
                     (course) =>
                         course.professor?.trim().toLocaleLowerCase() ===
                         professorName.toLocaleLowerCase()

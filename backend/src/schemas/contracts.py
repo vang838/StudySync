@@ -28,13 +28,6 @@ class PasswordResetRequest(BaseModel):
     password: str = Field(min_length=8)
 
 
-class AuthRegisterRequest(BaseModel):
-    first_name: str = Field(min_length=1, max_length=128)
-    last_name: str = Field(min_length=1, max_length=128)
-    email: EmailStr
-    password: str = Field(min_length=8)
-
-
 class CourseCreateRequest(BaseModel):
     course_id: str = Field(min_length=2, max_length=128)
     title: str = Field(min_length=1, max_length=200)
@@ -46,14 +39,6 @@ class CourseCreateRequest(BaseModel):
 
 class SaveCourseRequest(BaseModel):
     user_id: int = Field(ge=1)
-
-
-class ProfessorReviewCreateRequest(BaseModel):
-    professor: str = Field(min_length=1, max_length=200)
-    course_id: str = Field(min_length=1, max_length=128)
-    user_id: int = Field(ge=1)
-    rating: int = Field(ge=1, le=5)
-    feedback: str = Field(min_length=1, max_length=4000)
 
 
 class ForumPostCreateRequest(BaseModel):
