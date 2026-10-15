@@ -59,20 +59,36 @@ export default function ProfessorSearchPage() {
         setSearched(true);
 
         try {
-            const url = new URL("/api/courses/search", window.location.origin);
-            url.searchParams.set("professor", professorName);
+            const allCourses: CourseResult[] = [];
+            let currentPage = 1;
+            let totalPages = 1;
 
-            const response = await fetch(url.toString());
+            do {
+                const url = new URL("/api/courses/search", window.location.origin);
+                url.searchParams.set("professor", professorName);
+                url.searchParams.set("page", String(currentPage));
+                url.searchParams.set("per_page", "100");
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+                const response = await fetch(url.toString());
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-            const data: CourseResult[] = await response.json();
+                const data = await response.json();
+                const pageCourses: CourseResult[] = Array.isArray(data)
+                    ? data
+                    : (typeof data === "object" && data !== null && Array.isArray(data.courses) ? data.courses : []);
+                allCourses.push(...pageCourses);
+
+                totalPages = (typeof data === "object" && data !== null && typeof data.total_pages === "number")
+                    ? data.total_pages
+                    : 1;
+                currentPage += 1;
+            } while (currentPage <= totalPages);
 
             const professorMap = new Map<string, CourseResult[]>();
 
-            data.forEach((course) => {
+            allCourses.forEach((course) => {
                 if (!course.professor) {
                     return;
                 }
