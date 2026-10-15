@@ -1,18 +1,28 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, exists
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
-from src.db.models import Course, ProfessorReview
+from src.db.models import Course, ProfessorReview, User
 from src.db.session import get_db
+from src.schemas.contracts import ProfessorReviewCreateRequest
 
 router = APIRouter(prefix="/professor-reviews", tags=["professor-reviews"])
 
 
 def _serialize_review(review: ProfessorReview) -> dict:
+    author = getattr(review, "author", None)
     return {
         "review_id": review.review_id,
         "professor": review.professor,
         "course_id": review.course_id,
+        "user_id": getattr(review, "user_id", None),
+        "author_name": (
+            f"{author.user_first_name} {author.user_last_name}".strip()
+            if author is not None
+            else None
+        ),
         "rating": review.rating,
         "feedback": review.feedback,
         "created_at": review.created_at,
@@ -38,9 +48,10 @@ def get_professor_reviews(
 ) -> list[dict]:
     """Returns reviews for a professor with optional rating and course filters."""
 
-    query = db.query(ProfessorReview).filter(
-        ProfessorReview.professor == professor
-    )
+    query = db.query(ProfessorReview)
+    if hasattr(ProfessorReview, "author"):
+        query = query.options(joinedload(ProfessorReview.author))
+    query = query.filter(ProfessorReview.professor == professor)
 
     if rating is not None:
         query = query.filter(ProfessorReview.rating == rating)
@@ -51,6 +62,104 @@ def get_professor_reviews(
     reviews = query.order_by(ProfessorReview.created_at.desc()).all()
 
     return [_serialize_review(review) for review in reviews]
+
+
+@router.get("/users/{user_id}")
+def get_user_professor_reviews(
+    user_id: int,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Returns professor reviews authored by a user."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User '{user_id}' not found.",
+        )
+
+    if not hasattr(ProfessorReview, "user_id"):
+        return []
+
+    query = db.query(ProfessorReview)
+    if hasattr(ProfessorReview, "author"):
+        query = query.options(joinedload(ProfessorReview.author))
+    reviews = (
+        query
+        .filter(ProfessorReview.user_id == user_id)
+        .order_by(ProfessorReview.created_at.desc())
+        .all()
+    )
+    return [_serialize_review(review) for review in reviews]
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_professor_review(
+    payload: ProfessorReviewCreateRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Creates a professor review associated with its course and optional author."""
+    professor = payload.professor.strip()
+    feedback = payload.feedback.strip()
+    if not professor or not feedback:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Professor and feedback must not be blank.",
+        )
+
+    course = db.get(Course, payload.course_id)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course '{payload.course_id}' not found.",
+        )
+    if course.professor != professor:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The selected course is not taught by this professor.",
+        )
+
+    user_id: int | None = payload.user_id
+    if user_id is not None:
+        user = db.get(User, user_id)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User '{user_id}' not found.",
+            )
+
+    duplicate_query = db.query(ProfessorReview).filter(
+        ProfessorReview.professor == professor,
+        ProfessorReview.course_id == course.course_id,
+    )
+    if user_id is not None and hasattr(ProfessorReview, "user_id"):
+        duplicate_query = duplicate_query.filter(ProfessorReview.user_id == user_id)
+    existing_review = duplicate_query.first()
+    if existing_review is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A matching professor review already exists.",
+        )
+
+    review = ProfessorReview(
+        professor=professor,
+        course_id=course.course_id,
+        rating=payload.rating,
+        feedback=feedback,
+    )
+    if user_id is not None and hasattr(review, "user_id"):
+        setattr(review, "user_id", user_id)
+    db.add(review)
+
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Unable to create professor review due to a conflict.",
+        ) from error
+    db.refresh(review)
+    return _serialize_review(review)
 
 
 @router.get("/search")
