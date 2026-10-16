@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     document_max_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0, alias="DOCUMENT_MAX_UPLOAD_BYTES")
     document_chunk_max_words: int = Field(default=300, gt=0, alias="DOCUMENT_CHUNK_MAX_WORDS")
     document_chunk_overlap_words: int = Field(default=50, ge=0, alias="DOCUMENT_CHUNK_OVERLAP_WORDS")
+    uwm_catalog_sync_on_startup: bool = Field(default=False, alias="UWM_CATALOG_SYNC_ON_STARTUP")  ################ Enable catalog sync on startup, this can be disabled during development or testing
+    uwm_catalog_base_url: str = Field(default="https://catalog.uwm.edu", alias="UWM_CATALOG_BASE_URL")
+    uwm_catalog_timeout_seconds: float = Field(default=20.0, gt=1.0, alias="UWM_CATALOG_TIMEOUT_SECONDS")
+    uwm_catalog_max_subjects: int | None = Field(default=None, ge=1, alias="UWM_CATALOG_MAX_SUBJECTS")
 
     @property
     def cors_origins(self) -> list[str]:

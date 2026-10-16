@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from 'next/link';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -25,6 +25,22 @@ type ApiCourse = {
     year: number;
 };
 
+type CourseSearchPayload = {
+    courses: ApiCourse[];
+    total_count: number;
+    page: number;
+    per_page: number;
+    total_pages: number;
+};
+
+type CourseSearchResult = {
+    courses: Course[];
+    totalCount: number;
+    totalPages: number;
+};
+
+const PAGE_SIZE = 24;
+
 const normalizeCourse = (item: ApiCourse): Course => ({
     id: item.course_id,
     name: item.title,
@@ -34,42 +50,59 @@ const normalizeCourse = (item: ApiCourse): Course => ({
     year: item.year,
 });
 
-// Function to fetch courses from the API endpoint
 const fetchCourses = async (
     filters: CourseSearchFilters,
     query: string,
     savedOnly: boolean,
     userId: number,
-): Promise<Course[]> => {
+    page: number,
+    perPage: number,
+): Promise<CourseSearchResult> => {
     const url = new URL('/api/courses/search', window.location.origin);
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+
     url.searchParams.set('subject', filters.subject);
     url.searchParams.set('courseNumber', filters.courseNumber);
     url.searchParams.set('professor', filters.professor);
+    if (filters.year.trim().length > 0) {
+        url.searchParams.set('year', filters.year.trim());
+    }
     url.searchParams.set('name', query);
     url.searchParams.set('savedOnly', savedOnly ? 'true' : 'false');
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per_page', String(perPage));
+
     if (savedOnly) {
         url.searchParams.set('user_id', String(userId));
     }
 
     try {
         const response = await fetch(url.toString(), { signal: controller.signal });
-
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        // Safely check if the data is an array of courses, or if it contains a 'courses' array.
         if (Array.isArray(data)) {
-            return (data as ApiCourse[]).map(normalizeCourse);
+            const normalizedCourses = (data as ApiCourse[]).map(normalizeCourse);
+            return {
+                courses: normalizedCourses,
+                totalCount: normalizedCourses.length,
+                totalPages: 1,
+            };
         }
+
         if (typeof data === 'object' && data !== null && Array.isArray(data.courses)) {
-            return (data.courses as ApiCourse[]).map(normalizeCourse);
+            const payload = data as CourseSearchPayload;
+            return {
+                courses: payload.courses.map(normalizeCourse),
+                totalCount: payload.total_count,
+                totalPages: payload.total_pages,
+            };
         }
-        // Throwing a specific error if the structure is unrecognizable
-        throw new Error("API response did not contain a recognizable array of courses.");
+
+        throw new Error('API response did not contain a recognizable array of courses.');
     } finally {
         window.clearTimeout(timeoutId);
     }
@@ -81,14 +114,19 @@ export default function CourseSearchPage() {
         subject: '',
         courseNumber: '',
         professor: '',
+        year: '',
     });
     const [courses, setCourses] = useState<Course[]>([]);
     const [subjectOptions, setSubjectOptions] = useState<string[]>([]);
+    const [yearOptions, setYearOptions] = useState<number[]>([]);
     const [savedCourseIds, setSavedCourseIds] = useState<string[]>([]);
     const [savedOnlyFilter, setSavedOnlyFilter] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const hasLoadedSubjectsRef = useRef(false);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const hasLoadedFilterOptionsRef = useRef(false);
 
     const getCurrentUserId = useCallback(() => {
         if (typeof window === 'undefined') {
@@ -129,30 +167,41 @@ export default function CourseSearchPage() {
         }
     }, [getCurrentUserId]);
 
-    const loadSubjectOptions = useCallback(async () => {
-        if (hasLoadedSubjectsRef.current) {
+    const loadFilterOptions = useCallback(async () => {
+        if (hasLoadedFilterOptionsRef.current) {
             return;
         }
 
-        hasLoadedSubjectsRef.current = true;
+        hasLoadedFilterOptionsRef.current = true;
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), 10000);
 
         try {
-            const response = await fetch('/api/courses/subjects', { signal: controller.signal });
-            if (!response.ok) {
+            const [subjectsResponse, yearsResponse] = await Promise.all([
+                fetch('/api/courses/subjects', { signal: controller.signal }),
+                fetch('/api/courses/years', { signal: controller.signal }),
+            ]);
+
+            if (!subjectsResponse.ok || !yearsResponse.ok) {
                 return;
             }
-            const subjects = await response.json();
+
+            const subjects = await subjectsResponse.json();
             if (Array.isArray(subjects)) {
                 const normalized = subjects.filter(
                     (subject): subject is string => typeof subject === 'string' && subject.trim().length > 0,
                 );
                 setSubjectOptions(normalized);
             }
+
+            const years = await yearsResponse.json();
+            if (Array.isArray(years)) {
+                const normalized = years.filter((year): year is number => Number.isInteger(year));
+                setYearOptions(normalized);
+            }
         } catch (err) {
             if (!(err instanceof Error && err.name === 'AbortError')) {
-                console.error('Failed to load subject options:', err);
+                console.error('Failed to load course filter options:', err);
             }
         } finally {
             window.clearTimeout(timeoutId);
@@ -163,21 +212,34 @@ export default function CourseSearchPage() {
         setLoading(true);
         setError(null);
         try {
-            const results = await fetchCourses(filters, searchTerm, savedOnlyFilter, getCurrentUserId());
-            setCourses(results);
+            const results = await fetchCourses(
+                filters,
+                searchTerm,
+                savedOnlyFilter,
+                getCurrentUserId(),
+                page,
+                PAGE_SIZE,
+            );
+            setCourses(results.courses);
+            setTotalPages(results.totalPages);
+            setTotalCount(results.totalCount);
         } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') {
                 setError('Course search timed out. Please try again.');
                 setCourses([]);
+                setTotalCount(0);
+                setTotalPages(1);
                 return;
             }
             console.error('Course fetch failed:', err);
-            setError("Failed to fetch course data. Please try again.");
+            setError('Failed to fetch course data. Please try again.');
             setCourses([]);
+            setTotalCount(0);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    }, [filters, getCurrentUserId, savedOnlyFilter, searchTerm]);
+    }, [filters, getCurrentUserId, page, savedOnlyFilter, searchTerm]);
 
     const handleSaveToggle = useCallback(async (courseId: string) => {
         const userId = getCurrentUserId();
@@ -222,13 +284,45 @@ export default function CourseSearchPage() {
         }
     }, [courses, getCurrentUserId, savedCourseIds]);
 
+    const paginationItems = useMemo(() => {
+        const items: Array<number | 'ellipsis'> = [];
+        if (totalPages <= 1) {
+            return [1];
+        }
+
+        const windowStart = Math.max(1, page - 1);
+        const windowEnd = Math.min(totalPages, page + 1);
+
+        items.push(1);
+
+        if (windowStart > 2) {
+            items.push('ellipsis');
+        }
+
+        for (let pageNumber = windowStart; pageNumber <= windowEnd; pageNumber += 1) {
+            if (pageNumber !== 1 && pageNumber !== totalPages) {
+                items.push(pageNumber);
+            }
+        }
+
+        if (windowEnd < totalPages - 1) {
+            items.push('ellipsis');
+        }
+
+        if (totalPages > 1) {
+            items.push(totalPages);
+        }
+
+        return items;
+    }, [page, totalPages]);
+
     useEffect(() => {
         void syncSavedCourses();
     }, [syncSavedCourses]);
 
     useEffect(() => {
-        void loadSubjectOptions();
-    }, [loadSubjectOptions]);
+        void loadFilterOptions();
+    }, [loadFilterOptions]);
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
@@ -260,7 +354,7 @@ export default function CourseSearchPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Filter Courses</CardTitle>
-                                <CardDescription>Narrow results by subject, number, or professor.</CardDescription>
+                                <CardDescription>Narrow results by subject, number, professor, or year.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
@@ -268,7 +362,10 @@ export default function CourseSearchPage() {
                                     <select
                                         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                         value={filters.subject}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
+                                        onChange={(e) => {
+                                            setPage(1);
+                                            setFilters((prev) => ({ ...prev, subject: e.target.value }));
+                                        }}
                                     >
                                         <option value="">All Subjects</option>
                                         {subjectOptions.map((subject) => (
@@ -284,7 +381,10 @@ export default function CourseSearchPage() {
                                     <Input
                                         className="w-full"
                                         value={filters.courseNumber}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, courseNumber: e.target.value }))}
+                                        onChange={(e) => {
+                                            setPage(1);
+                                            setFilters((prev) => ({ ...prev, courseNumber: e.target.value }));
+                                        }}
                                         placeholder="CS101"
                                     />
                                 </div>
@@ -294,9 +394,31 @@ export default function CourseSearchPage() {
                                     <Input
                                         className="w-full"
                                         value={filters.professor}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, professor: e.target.value }))}
+                                        onChange={(e) => {
+                                            setPage(1);
+                                            setFilters((prev) => ({ ...prev, professor: e.target.value }));
+                                        }}
                                         placeholder="Reed"
                                     />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted-foreground">Year</label>
+                                    <select
+                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                        value={filters.year}
+                                        onChange={(e) => {
+                                            setPage(1);
+                                            setFilters((prev) => ({ ...prev, year: e.target.value }));
+                                        }}
+                                    >
+                                        <option value="">All Years</option>
+                                        {yearOptions.map((year) => (
+                                            <option key={year} value={String(year)}>
+                                                {year}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 <div className="flex items-center gap-2 pt-1">
@@ -305,7 +427,10 @@ export default function CourseSearchPage() {
                                         type="checkbox"
                                         className="h-4 w-4 rounded border border-input"
                                         checked={savedOnlyFilter}
-                                        onChange={(e) => setSavedOnlyFilter(e.target.checked)}
+                                        onChange={(e) => {
+                                            setPage(1);
+                                            setSavedOnlyFilter(e.target.checked);
+                                        }}
                                     />
                                     <label
                                         htmlFor="saved-only-filter"
@@ -316,7 +441,15 @@ export default function CourseSearchPage() {
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <Button onClick={handleSearch} className="w-full">Apply Filters</Button>
+                                <Button
+                                    onClick={() => {
+                                        setPage(1);
+                                        void handleSearch();
+                                    }}
+                                    className="w-full"
+                                >
+                                    Apply Filters
+                                </Button>
                             </CardFooter>
                         </Card>
                     </aside>
@@ -333,14 +466,24 @@ export default function CourseSearchPage() {
                                     type="text"
                                     placeholder="Search by course name or keyword..."
                                     value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={(e) => {
+                                        setPage(1);
+                                        setSearchTerm(e.target.value);
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
-                                            handleSearch();
+                                            setPage(1);
+                                            void handleSearch();
                                         }
                                     }}
                                 />
-                                <Button onClick={handleSearch} disabled={loading}>
+                                <Button
+                                    onClick={() => {
+                                        setPage(1);
+                                        void handleSearch();
+                                    }}
+                                    disabled={loading}
+                                >
                                     {loading ? 'Searching...' : 'Search'}
                                 </Button>
                             </CardContent>
@@ -350,13 +493,13 @@ export default function CourseSearchPage() {
                             <CardHeader>
                                 <CardTitle>Results</CardTitle>
                                 <CardDescription>
-                                    {courses.length} course{courses.length === 1 ? '' : 's'} found
+                                    {totalCount} course{totalCount === 1 ? '' : 's'} found
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-4">
                                 {error && <p className="text-sm font-medium text-destructive">{error}</p>}
                                 {loading && <p className="text-sm text-muted-foreground">Loading course results...</p>}
-                                {!loading && !error && courses.length === 0 && (
+                                {!loading && !error && totalCount === 0 && (
                                     <p className="text-sm text-muted-foreground">No courses found matching your criteria.</p>
                                 )}
 
@@ -367,7 +510,7 @@ export default function CourseSearchPage() {
 
                                             return (
                                                 <div key={course.id} className="space-y-3">
-                                                    <Link href={`/courses/${course.id}`} className="block">
+                                                    <Link href={`/courses/${encodeURIComponent(course.id)}`} className="block">
                                                         <Card className="transition hover:ring-2 hover:ring-primary/40">
                                                             <CardHeader>
                                                                 <CardTitle>{course.name}</CardTitle>
@@ -396,6 +539,45 @@ export default function CourseSearchPage() {
                                                 </div>
                                             );
                                         })}
+                                    </div>
+                                )}
+
+                                {!loading && !error && totalPages > 1 && (
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                        {paginationItems.map((item, index) => {
+                                            if (item === 'ellipsis') {
+                                                return (
+                                                    <span key={`ellipsis-${index}`} className="px-1 text-xs text-muted-foreground">
+                                                        ...
+                                                    </span>
+                                                );
+                                            }
+
+                                            const isActive = item === page;
+                                            return (
+                                                <button
+                                                    key={`page-${item}`}
+                                                    type="button"
+                                                    onClick={() => setPage(item)}
+                                                    disabled={isActive}
+                                                    className={`text-sm ${
+                                                        isActive
+                                                            ? 'font-semibold text-foreground'
+                                                            : 'text-primary underline-offset-2 hover:underline'
+                                                    } disabled:cursor-default`}
+                                                >
+                                                    {item}
+                                                </button>
+                                            );
+                                        })}
+                                        <button
+                                            type="button"
+                                            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                                            disabled={page >= totalPages}
+                                            className="text-sm text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
+                                        >
+                                            Next
+                                        </button>
                                     </div>
                                 )}
                             </CardContent>

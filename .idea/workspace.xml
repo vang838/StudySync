@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="55b8c010-7eb1-48ba-ab22-e5fc86e8a6ca" name="Changes" comment="Added student dashboard layout and examples">
+      <change afterPath="$PROJECT_DIR$/backend/alembic.ini" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/migrations/README" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/migrations/env.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/migrations/script.py.mako" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/migrations/versions/8812ff7d578f_add_chunk_source_provenance.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/migrations/versions/c4f7a8d1e2b3_add_forum_points_currency_and_likes.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/scripts/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/scripts/demo_sprint3.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/scripts/test_r2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/adapters/embedding/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/adapters/embedding/ollama.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/adapters/retrieval/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/adapters/retrieval/llamaindex.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/adapters/storage/r2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/adapters/vector_store/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/adapters/vector_store/pinecone.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/api/v1/professor_reviews.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/api/v1/users.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/docs_upload.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_chunker.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_chunker_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_embedding_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_extraction_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_ingestion_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_normalization_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_normalizer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_parser.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_retrieval_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/document_vector_indexing_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/rag_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/application/uwm_catalog_sync_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/core/forum_points.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/core/security.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/ports/embedding.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/ports/object_storage.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/ports/vector_store.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/schemas/retrieval.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_auth.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_course_saves.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_chunker.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_chunking_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_embedding_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_extraction_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_ingestion_pipeline.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_ingestion_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_models.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_normalization_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_normalizer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_parser.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_retrieval_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_upload.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_document_vector_indexing_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_documents_api.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_llamaindex_retriever.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_ollama_embedding.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_pinecone_vector_store.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_professor_reviews.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_professor_search.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_r2_storage.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_rag_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_retrieval_metadata.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_uwm_catalog_sync_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/compose-backend-db.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/auth/[action]/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/[courseId]/forum/posts/[postId]/bookmark/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/[courseId]/forum/posts/[postId]/like/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/[courseId]/forum/posts/[postId]/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/[courseId]/forum/posts/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/[courseId]/members/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/[courseId]/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/[courseId]/save/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/saved/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/search/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/subjects/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/courses/years/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/professor-reviews/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/professor-reviews/search/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/professor_reviews/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/api/users/[userId]/route.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/collaborative-hub/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/courses/[courseId]/forum/[postId]/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/courses/[courseId]/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/courses/courseId/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/courses/course_search/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/courses/create/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/courses/layout.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/professors/[professor]/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/professors/create/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/professors/layout.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/professors/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/users/[userId]/profile/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/users/[userId]/ratings/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/users/[userId]/settings/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/users/[userId]/student_profile/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/users/[userId]/uploads/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/app/users/layout.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/components/assistant/AssistantWidget.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/components/course-overview/CourseForumSection.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/components/course-overview/CourseMembersSection.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/components/course-overview/CourseOverview.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/components/course-overview/CourseSaveToggleButton.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/adapters/llm/ollama.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/adapters/llm/ollama.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/api/dependencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/api/dependencies.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/api/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/api/router.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/api/v1/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/api/v1/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/api/v1/chat.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/api/v1/chat.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/api/v1/courses.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/api/v1/courses.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/api/v1/documents.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/api/v1/documents.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/core/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/db/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/db/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/db/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/db/session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/schemas/contracts.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/schemas/contracts.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/tests/test_chat_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/tests/test_chat_api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/uv.lock" beforeDir="false" afterPath="$PROJECT_DIR$/backend/uv.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/auth/auth.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/auth/auth.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/auth/forgotpassword/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/auth/forgotpassword/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/auth/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/auth/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/auth/resetpassword/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/auth/resetpassword/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/auth/signin/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/auth/signin/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/auth/signup/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/auth/signup/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/dashboard/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/dashboard/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/button.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/components/ui/button.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/components/ui/header.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/components/ui/header.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/next.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="TypeScript File" />
+        <option value="TypeScript JSX File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;SawmillBot&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/vang838/StudySync.git&quot;,
+    &quot;accountId&quot;: &quot;63be2cbc-dd76-4a83-9130-b58d4b4b73b3&quot;
+  }
+}</component>
+  <component name="KubernetesApiProvider">{}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 0
+}</component>
+  <component name="ProjectId" id="3JkY8z5fMa5UYOcNPmgACI5MGvq" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "Merging main",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "run.code.analysis.last.selected.profile": "aDefault",
+    "ts.external.directory.path": "/Users/soumilbhatt/Documents/GitHub/StudySync/frontend/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-9c94529fcfe0-JavaScript-PY-252.26199.168" />
+        <option value="bundled-python-sdk-b3d66beaba9a-c6efb3732140-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.26199.168" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="55b8c010-7eb1-48ba-ab22-e5fc86e8a6ca" name="Changes" comment="" />
+      <created>1790206378017</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1790206378017</updated>
+      <workItem from="1790206379223" duration="9744000" />
+      <workItem from="1790901350158" duration="7709000" />
+      <workItem from="1792120403054" duration="189000" />
+    </task>
+    <task id="LOCAL-00001" summary="Added student dashboard layout and examples">
+      <option name="closed" value="true" />
+      <created>1790294924264</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1790294924264</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Added student dashboard layout and examples" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added student dashboard layout and examples" />
+  </component>
+</project>
