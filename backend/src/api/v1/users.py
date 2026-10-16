@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 from src.schemas.contracts import (
     UpdateUserRequest
 )
 from src.db.models import User
+from src.core.forum_points import (
+    POINTS_PER_FORUM_LIKE_RECEIVED,
+    POINTS_PER_FORUM_POST_OR_REPLY,
+)
 from src.db.session import get_db
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -25,6 +28,11 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)) -> dict:
         "last_name": user.user_last_name,
         "full_name": f"{user.user_first_name} {user.user_last_name}".strip(),
         "email": user.user_email,
+        "forum_points": user.forum_points_balance,
+        "forum_point_values": {
+            "post_or_reply": POINTS_PER_FORUM_POST_OR_REPLY,
+            "like_received": POINTS_PER_FORUM_LIKE_RECEIVED,
+        },
         "created_at": user.created_at,
         "updated_at": user.updated_at,
     }

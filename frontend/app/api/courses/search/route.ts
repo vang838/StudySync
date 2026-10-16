@@ -12,6 +12,12 @@ export async function GET(request: NextRequest) {
   targetUrl.searchParams.set('name', incomingUrl.searchParams.get('name') ?? '');
   targetUrl.searchParams.set('professor', incomingUrl.searchParams.get('professor') ?? '');
   targetUrl.searchParams.set('savedOnly', incomingUrl.searchParams.get('savedOnly') ?? 'false');
+  targetUrl.searchParams.set('page', incomingUrl.searchParams.get('page') ?? '1');
+  targetUrl.searchParams.set('per_page', incomingUrl.searchParams.get('per_page') ?? '24');
+  const year = incomingUrl.searchParams.get('year');
+  if (year && year.trim().length > 0) {
+    targetUrl.searchParams.set('year', year);
+  }
 
   const userId = incomingUrl.searchParams.get('user_id');
   if (userId) {

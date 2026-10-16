@@ -1,10 +1,26 @@
-from typing import List
+from typing import List, Literal
+from urllib.parse import unquote
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import and_, func, literal, select
 from sqlalchemy.orm import Session
 
-from src.db.models import Course, CourseForumPost, User, UserCourseSave
+from src.application.uwm_catalog_sync_service import sync_uwm_catalog_courses
+from src.core.config import settings
+from src.db.models import (
+    Course,
+    CourseForumPost,
+    CourseForumPostBookmark,
+    CourseForumPostLike,
+    ForumPointTransaction,
+    User,
+    UserCourseSave,
+)
+from src.core.forum_points import (
+    POINTS_PER_FORUM_LIKE_RECEIVED,
+    POINTS_PER_FORUM_POST_OR_REPLY,
+)
 from src.db.session import get_db
 from src.schemas.contracts import (
     CourseCreateRequest,
@@ -43,6 +59,10 @@ def _serialize_user(user: User) -> dict:
 
 def _get_course_or_404(db: Session, course_id: str) -> Course:
     course = db.get(Course, course_id)
+    if course is None and "%" in course_id:
+        decoded_course_id = unquote(course_id)
+        if decoded_course_id != course_id:
+            course = db.get(Course, decoded_course_id)
     if course is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -75,7 +95,31 @@ def _assert_user_is_course_member(db: Session, course_id: str, user_id: int) -> 
         )
 
 
-def _serialize_forum_post(post: CourseForumPost, author_name: str) -> dict:
+def _record_forum_points(
+    db: Session,
+    user: User,
+    delta_points: int,
+    reason: str,
+    related_post_id: int | None = None,
+) -> None:
+    user.forum_points_balance += delta_points
+    db.add(
+        ForumPointTransaction(
+            user_id=user.user_id,
+            delta_points=delta_points,
+            reason=reason,
+            related_post_id=related_post_id,
+        )
+    )
+
+
+def _serialize_forum_post(
+    post: CourseForumPost,
+    author_name: str,
+    is_bookmarked: bool,
+    is_liked: bool,
+    like_count: int,
+) -> dict:
     return {
         "post_id": post.post_id,
         "course_id": post.course_id,
@@ -85,17 +129,114 @@ def _serialize_forum_post(post: CourseForumPost, author_name: str) -> dict:
         "content": post.content,
         "created_at": post.created_at,
         "updated_at": post.updated_at,
+        "is_bookmarked": is_bookmarked,
+        "is_liked": is_liked,
+        "like_count": like_count,
+        "reply_count": 0,
         "replies": [],
     }
 
 
-def _build_forum_tree(rows: list[tuple[CourseForumPost, str, str]]) -> tuple[list[dict], dict[int, dict]]:
+def _populate_reply_counts(post_data: dict) -> int:
+    total_replies = 0
+    for reply in post_data["replies"]:
+        total_replies += 1 + _populate_reply_counts(reply)
+    post_data["reply_count"] = total_replies
+    return total_replies
+
+
+def _post_matches_search(post_data: dict, normalized_query: str) -> bool:
+    if normalized_query in post_data["content"].lower():
+        return True
+    if normalized_query in post_data["author_name"].lower():
+        return True
+    return any(_post_matches_search(reply, normalized_query) for reply in post_data["replies"])
+
+
+def _load_forum_rows(
+    db: Session,
+    course_id: str,
+    user_id: int | None = None,
+) -> list[tuple[CourseForumPost, str, str, bool]]:
+    if user_id is None:
+        return db.execute(
+            select(
+                CourseForumPost,
+                User.user_first_name,
+                User.user_last_name,
+                literal(False),
+            )
+            .join(User, User.user_id == CourseForumPost.user_id)
+            .where(CourseForumPost.course_id == course_id)
+            .order_by(CourseForumPost.created_at.asc(), CourseForumPost.post_id.asc())
+        ).all()
+
+    return db.execute(
+        select(
+            CourseForumPost,
+            User.user_first_name,
+            User.user_last_name,
+            CourseForumPostBookmark.id.is_not(None),
+        )
+        .join(User, User.user_id == CourseForumPost.user_id)
+        .outerjoin(
+            CourseForumPostBookmark,
+            and_(
+                CourseForumPostBookmark.post_id == CourseForumPost.post_id,
+                CourseForumPostBookmark.user_id == user_id,
+            ),
+        )
+        .where(CourseForumPost.course_id == course_id)
+        .order_by(CourseForumPost.created_at.asc(), CourseForumPost.post_id.asc())
+    ).all()
+
+
+def _load_forum_like_metadata(
+    db: Session,
+    course_id: str,
+    user_id: int | None = None,
+) -> tuple[dict[int, int], set[int]]:
+    like_count_rows = db.execute(
+        select(CourseForumPostLike.post_id, func.count(CourseForumPostLike.id))
+        .join(CourseForumPost, CourseForumPost.post_id == CourseForumPostLike.post_id)
+        .where(CourseForumPost.course_id == course_id)
+        .group_by(CourseForumPostLike.post_id)
+    ).all()
+    like_counts_by_post_id = {post_id: int(count) for post_id, count in like_count_rows}
+
+    if user_id is None:
+        return like_counts_by_post_id, set()
+
+    liked_post_ids = set(
+        db.scalars(
+            select(CourseForumPostLike.post_id)
+            .join(CourseForumPost, CourseForumPost.post_id == CourseForumPostLike.post_id)
+            .where(
+                CourseForumPost.course_id == course_id,
+                CourseForumPostLike.user_id == user_id,
+            )
+        ).all()
+    )
+    return like_counts_by_post_id, liked_post_ids
+
+
+def _build_forum_tree(
+    rows: list[tuple[CourseForumPost, str, str, bool]],
+    like_counts_by_post_id: dict[int, int],
+    liked_post_ids: set[int],
+) -> tuple[list[dict], dict[int, dict]]:
     by_id: dict[int, dict] = {}
     root_posts: list[dict] = []
 
-    for post, first_name, last_name in rows:
+    for post, first_name, last_name, is_bookmarked in rows:
         author_name = f"{first_name} {last_name}".strip()
-        by_id[post.post_id] = _serialize_forum_post(post, author_name)
+        by_id[post.post_id] = _serialize_forum_post(
+            post,
+            author_name,
+            bool(is_bookmarked),
+            post.post_id in liked_post_ids,
+            like_counts_by_post_id.get(post.post_id, 0),
+        )
 
     for post_data in by_id.values():
         parent_post_id = post_data["parent_post_id"]
@@ -103,6 +244,9 @@ def _build_forum_tree(rows: list[tuple[CourseForumPost, str, str]]) -> tuple[lis
             by_id[parent_post_id]["replies"].append(post_data)
         else:
             root_posts.append(post_data)
+
+    for post_data in root_posts:
+        _populate_reply_counts(post_data)
 
     return root_posts, by_id
 
@@ -112,7 +256,9 @@ def _search_courses(
     filters: dict,
     saved_only: bool = False,
     user_id: int | None = None,
-) -> List[dict]:
+    page: int = 1,
+    per_page: int = 24,
+) -> tuple[List[dict], int]:
     """Queries the database for courses matching the given filters."""
     query = db.query(Course)
     
@@ -126,6 +272,8 @@ def _search_courses(
         query = query.filter(Course.title.ilike(f"%{filters['name']}%"))
     if filters.get("professor"):
         query = query.filter(Course.professor.ilike(f"%{filters['professor']}%"))
+    if filters.get("year") is not None:
+        query = query.filter(Course.year == filters["year"])
 
     if saved_only:
         if user_id is None:
@@ -138,9 +286,10 @@ def _search_courses(
             UserCourseSave.user_id == user_id
         )
 
-    query = query.order_by(Course.title.asc())
-    courses = query.all()
-    return [_serialize_course(course) for course in courses]
+    total_count = query.count()
+    offset = (page - 1) * per_page
+    courses = query.order_by(Course.title.asc()).offset(offset).limit(per_page).all()
+    return [_serialize_course(course) for course in courses], total_count
 
 
 @router.get("/search")
@@ -150,9 +299,12 @@ def search_courses(
     courseNumber: str | None = Query(None, description="Filter by course number (e.g., CS101)"),
     name: str | None = Query(None, description="Search by course name (partial match)"),
     professor: str | None = Query(None, description="Filter by professor/instructor name"),
+    year: int | None = Query(None, ge=1900, le=3000, description="Filter by course year."),
     savedOnly: bool = Query(False, description="When true, only courses saved by the user are returned."),
     user_id: int | None = Query(None, ge=1, description="Required when savedOnly is true."),
-) -> List[dict]:
+    page: int = Query(1, ge=1, description="1-based page number."),
+    per_page: int = Query(24, ge=1, le=100, description="Results per page."),
+) -> dict:
     """
     Searches the course catalog by querying the database.
     The database session is managed by FastAPI's dependency injection system.
@@ -167,8 +319,25 @@ def search_courses(
         search_filters["name"] = name
     if professor:
         search_filters["professor"] = professor
-        
-    return _search_courses(db, search_filters, saved_only=savedOnly, user_id=user_id)
+    if year is not None:
+        search_filters["year"] = year
+
+    courses, total_count = _search_courses(
+        db,
+        search_filters,
+        saved_only=savedOnly,
+        user_id=user_id,
+        page=page,
+        per_page=per_page,
+    )
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+    return {
+        "courses": courses,
+        "total_count": total_count,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+    }
 
 
 @router.get("/subjects")
@@ -179,30 +348,111 @@ def list_course_subjects(db: Session = Depends(get_db)) -> List[str]:
     return [subject for subject in subjects if subject]
 
 
-@router.get("/{course_id}/forum/posts")
-def list_forum_posts(course_id: str, db: Session = Depends(get_db)) -> List[dict]:
-    _get_course_or_404(db, course_id)
-    rows = db.execute(
-        select(CourseForumPost, User.user_first_name, User.user_last_name)
-        .join(User, User.user_id == CourseForumPost.user_id)
-        .where(CourseForumPost.course_id == course_id)
-        .order_by(CourseForumPost.created_at.asc(), CourseForumPost.post_id.asc())
+@router.get("/years")
+def list_course_years(db: Session = Depends(get_db)) -> List[int]:
+    years = db.scalars(
+        select(Course.year).distinct().order_by(Course.year.desc())
     ).all()
+    return [year for year in years if year is not None]
 
-    root_posts, _ = _build_forum_tree(rows)
+
+@router.post("/catalog/sync-uwm")
+def sync_uwm_catalog(
+    db: Session = Depends(get_db),
+    max_subjects: int | None = Query(
+        default=None,
+        ge=1,
+        description="Optional cap used for smoke-testing sync speed.",
+    ),
+) -> dict:
+    try:
+        result = sync_uwm_catalog_courses(
+            db,
+            base_url=settings.uwm_catalog_base_url.rstrip("/"),
+            timeout_seconds=settings.uwm_catalog_timeout_seconds,
+            max_subjects=max_subjects,
+        )
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch UWM catalog data: {error}",
+        ) from error
+
+    return {
+        "subjects_processed": result.subject_count,
+        "courses_found": result.course_count_found,
+        "courses_inserted": result.inserted_count,
+        "courses_with_professor_backfill": result.updated_professor_count,
+        "failed_subjects": result.failed_subject_count,
+        "overwrite_policy": "Existing course_id rows are not replaced; only missing professor values are backfilled.",
+    }
+
+
+@router.get("/{course_id}/forum/posts")
+def list_forum_posts(
+    course_id: str,
+    db: Session = Depends(get_db),
+    q: str | None = Query(default=None, description="Search term for post content or author."),
+    user_id: int | None = Query(default=None, ge=1, description="Used to resolve bookmark state for posts."),
+    author_user_id: int | None = Query(default=None, ge=1, description="Filter to posts authored by this user."),
+    bookmarked_only: bool = Query(default=False, description="When true, return only bookmarked discussions."),
+    sort: Literal["newest", "popular"] = Query(default="newest", description="Sort mode for root discussions."),
+) -> List[dict]:
+    _get_course_or_404(db, course_id)
+    if user_id is not None:
+        _get_user_or_404(db, user_id)
+    if author_user_id is not None:
+        _get_user_or_404(db, author_user_id)
+    if bookmarked_only and user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="user_id is required when bookmarked_only is true.",
+        )
+
+    rows = _load_forum_rows(db, course_id, user_id=user_id)
+    like_counts_by_post_id, liked_post_ids = _load_forum_like_metadata(db, course_id, user_id=user_id)
+
+    root_posts, _ = _build_forum_tree(rows, like_counts_by_post_id, liked_post_ids)
+
+    normalized_query = (q or "").strip().lower()
+    if normalized_query:
+        root_posts = [post for post in root_posts if _post_matches_search(post, normalized_query)]
+
+    if author_user_id is not None:
+        root_posts = [post for post in root_posts if post["user_id"] == author_user_id]
+
+    if bookmarked_only:
+        root_posts = [post for post in root_posts if post["is_bookmarked"]]
+
+    if sort == "popular":
+        root_posts = sorted(
+            root_posts,
+            key=lambda post: (post["reply_count"], post["created_at"], post["post_id"]),
+            reverse=True,
+        )
+    else:
+        root_posts = sorted(
+            root_posts,
+            key=lambda post: (post["created_at"], post["post_id"]),
+            reverse=True,
+        )
+
     return root_posts
 
 
 @router.get("/{course_id}/forum/posts/{post_id}")
-def get_forum_post_thread(course_id: str, post_id: int, db: Session = Depends(get_db)) -> dict:
+def get_forum_post_thread(
+    course_id: str,
+    post_id: int,
+    db: Session = Depends(get_db),
+    user_id: int | None = Query(default=None, ge=1, description="Used to resolve bookmark state for the post."),
+) -> dict:
     _get_course_or_404(db, course_id)
-    rows = db.execute(
-        select(CourseForumPost, User.user_first_name, User.user_last_name)
-        .join(User, User.user_id == CourseForumPost.user_id)
-        .where(CourseForumPost.course_id == course_id)
-        .order_by(CourseForumPost.created_at.asc(), CourseForumPost.post_id.asc())
-    ).all()
-    _, by_id = _build_forum_tree(rows)
+    if user_id is not None:
+        _get_user_or_404(db, user_id)
+    rows = _load_forum_rows(db, course_id, user_id=user_id)
+    like_counts_by_post_id, liked_post_ids = _load_forum_like_metadata(db, course_id, user_id=user_id)
+    _, by_id = _build_forum_tree(rows, like_counts_by_post_id, liked_post_ids)
     selected = by_id.get(post_id)
     if selected is None:
         raise HTTPException(
@@ -238,10 +488,16 @@ def create_forum_post(
         parent_post_id=parent_post_id,
     )
     db.add(created)
+    _record_forum_points(
+        db,
+        user,
+        POINTS_PER_FORUM_POST_OR_REPLY,
+        reason="forum_post_or_reply_created",
+    )
     db.commit()
     db.refresh(created)
     author_name = f"{user.user_first_name} {user.user_last_name}".strip()
-    return _serialize_forum_post(created, author_name)
+    return _serialize_forum_post(created, author_name, False, False, 0)
 
 
 @router.put("/{course_id}/forum/posts/{post_id}")
@@ -275,7 +531,16 @@ def update_forum_post(
         if author is not None
         else "Unknown User"
     )
-    return _serialize_forum_post(post, author_name)
+    like_count = db.scalar(
+        select(func.count(CourseForumPostLike.id)).where(CourseForumPostLike.post_id == post.post_id)
+    )
+    user_liked = db.scalar(
+        select(CourseForumPostLike.id).where(
+            CourseForumPostLike.post_id == post.post_id,
+            CourseForumPostLike.user_id == payload.user_id,
+        )
+    )
+    return _serialize_forum_post(post, author_name, False, user_liked is not None, int(like_count or 0))
 
 
 @router.delete("/{course_id}/forum/posts/{post_id}")
@@ -302,6 +567,169 @@ def delete_forum_post(
     db.delete(post)
     db.commit()
     return {"message": "Forum post deleted successfully.", "post_id": post_id}
+
+
+@router.post("/{course_id}/forum/posts/{post_id}/bookmark")
+def bookmark_forum_post(
+    course_id: str,
+    post_id: int,
+    user_id: int = Query(..., ge=1, description="User bookmarking the forum post."),
+    db: Session = Depends(get_db),
+) -> dict:
+    _get_course_or_404(db, course_id)
+    _get_user_or_404(db, user_id)
+    _assert_user_is_course_member(db, course_id, user_id)
+    post = db.get(CourseForumPost, post_id)
+    if post is None or post.course_id != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Forum post '{post_id}' was not found for this course.",
+        )
+
+    existing_bookmark = db.scalar(
+        select(CourseForumPostBookmark.id).where(
+            CourseForumPostBookmark.user_id == user_id,
+            CourseForumPostBookmark.post_id == post_id,
+        )
+    )
+    if existing_bookmark is not None:
+        return {
+            "post_id": post_id,
+            "user_id": user_id,
+            "bookmarked": True,
+            "message": "Forum post is already bookmarked.",
+        }
+
+    bookmark = CourseForumPostBookmark(user_id=user_id, post_id=post_id)
+    db.add(bookmark)
+    db.commit()
+    return {"post_id": post_id, "user_id": user_id, "bookmarked": True}
+
+
+@router.delete("/{course_id}/forum/posts/{post_id}/bookmark")
+def remove_forum_post_bookmark(
+    course_id: str,
+    post_id: int,
+    user_id: int = Query(..., ge=1, description="User removing their bookmark."),
+    db: Session = Depends(get_db),
+) -> dict:
+    _get_course_or_404(db, course_id)
+    _get_user_or_404(db, user_id)
+    post = db.get(CourseForumPost, post_id)
+    if post is None or post.course_id != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Forum post '{post_id}' was not found for this course.",
+        )
+
+    bookmark = db.scalar(
+        select(CourseForumPostBookmark).where(
+            CourseForumPostBookmark.user_id == user_id,
+            CourseForumPostBookmark.post_id == post_id,
+        )
+    )
+    if bookmark is None:
+        return {
+            "post_id": post_id,
+            "user_id": user_id,
+            "bookmarked": False,
+            "message": "Forum post was not bookmarked.",
+        }
+
+    db.delete(bookmark)
+    db.commit()
+    return {"post_id": post_id, "user_id": user_id, "bookmarked": False}
+
+
+@router.post("/{course_id}/forum/posts/{post_id}/like")
+def like_forum_post(
+    course_id: str,
+    post_id: int,
+    user_id: int = Query(..., ge=1, description="User liking the forum post."),
+    db: Session = Depends(get_db),
+) -> dict:
+    _get_course_or_404(db, course_id)
+    _get_user_or_404(db, user_id)
+    _assert_user_is_course_member(db, course_id, user_id)
+    post = db.get(CourseForumPost, post_id)
+    if post is None or post.course_id != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Forum post '{post_id}' was not found for this course.",
+        )
+
+    existing_like = db.scalar(
+        select(CourseForumPostLike.id).where(
+            CourseForumPostLike.user_id == user_id,
+            CourseForumPostLike.post_id == post_id,
+        )
+    )
+    if existing_like is None:
+        db.add(CourseForumPostLike(user_id=user_id, post_id=post_id))
+        post_author = _get_user_or_404(db, post.user_id)
+        _record_forum_points(
+            db,
+            post_author,
+            POINTS_PER_FORUM_LIKE_RECEIVED,
+            reason="forum_like_received",
+            related_post_id=post_id,
+        )
+        db.commit()
+
+    like_count = db.scalar(
+        select(func.count(CourseForumPostLike.id)).where(CourseForumPostLike.post_id == post_id)
+    )
+    return {
+        "post_id": post_id,
+        "user_id": user_id,
+        "liked": True,
+        "like_count": int(like_count or 0),
+    }
+
+
+@router.delete("/{course_id}/forum/posts/{post_id}/like")
+def unlike_forum_post(
+    course_id: str,
+    post_id: int,
+    user_id: int = Query(..., ge=1, description="User removing their like."),
+    db: Session = Depends(get_db),
+) -> dict:
+    _get_course_or_404(db, course_id)
+    _get_user_or_404(db, user_id)
+    post = db.get(CourseForumPost, post_id)
+    if post is None or post.course_id != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Forum post '{post_id}' was not found for this course.",
+        )
+
+    existing_like = db.scalar(
+        select(CourseForumPostLike).where(
+            CourseForumPostLike.user_id == user_id,
+            CourseForumPostLike.post_id == post_id,
+        )
+    )
+    if existing_like is not None:
+        db.delete(existing_like)
+        post_author = _get_user_or_404(db, post.user_id)
+        _record_forum_points(
+            db,
+            post_author,
+            -POINTS_PER_FORUM_LIKE_RECEIVED,
+            reason="forum_like_removed",
+            related_post_id=post_id,
+        )
+        db.commit()
+
+    like_count = db.scalar(
+        select(func.count(CourseForumPostLike.id)).where(CourseForumPostLike.post_id == post_id)
+    )
+    return {
+        "post_id": post_id,
+        "user_id": user_id,
+        "liked": False,
+        "like_count": int(like_count or 0),
+    }
 
 
 @router.get("/saved")
@@ -460,13 +888,7 @@ def unsave_course_by_user_route(
 @router.get("/{course_id}")
 def get_course(course_id: str, db: Session = Depends(get_db)) -> dict:
     """Retrieves a single course by its unique ID from the database."""
-    # Assuming course_id matches Course.course_id
-    course = db.query(Course).filter(Course.course_id == course_id).first()
-    if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Course '{course_id}' not found in the database.",
-        )
+    course = _get_course_or_404(db, course_id)
     return _serialize_course(course)
 
 @router.get("")

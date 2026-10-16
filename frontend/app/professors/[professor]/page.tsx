@@ -17,9 +17,16 @@ type ProfessorReview = {
     review_id: number;
     professor: string;
     course_id: string;
+    user_id: number | null;
+    author_name: string | null;
     rating: number;
     feedback: string;
     created_at: string;
+};
+
+type Course = {
+    course_id: string;
+    title: string;
 };
 
 export default function ProfessorReviewsPage() {
@@ -40,13 +47,9 @@ export default function ProfessorReviewsPage() {
             setError(null);
 
             try {
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE_URL ??
-                    "http://127.0.0.1:8000";
-
                 const url = new URL(
-                    "/api/v1/professor-reviews",
-                    apiBase
+                    "/api/professor-reviews",
+                    window.location.origin
                 );
 
                 url.searchParams.set("professor", professorName);
@@ -117,14 +120,28 @@ export default function ProfessorReviewsPage() {
         <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
             <div className="mx-auto flex max-w-6xl flex-col gap-8 pb-10">
 
-                <header className="flex flex-col gap-2">
-                    <p className="text-sm font-medium text-muted-foreground">
-                        StudySync Professor Reviews
-                    </p>
+                <header className="flex flex-wrap items-end justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                        <p className="text-sm font-medium text-muted-foreground">
+                            StudySync Professor Reviews
+                        </p>
+                        <h1 className="font-heading text-3xl font-bold">
+                            {professorName}
+                        </h1>
+                    </div>
 
-                    <h1 className="font-heading text-3xl font-bold">
-                        {professorName}
-                    </h1>
+                    <div className="flex flex-wrap gap-2">
+                        <Link href="/professors">
+                            <Button variant="secondary" size="s">Back to Search</Button>
+                        </Link>
+                        <Link
+                            href={`/professors/create?professor=${encodeURIComponent(
+                                professorName
+                            )}`}
+                        >
+                            <Button size="s">Write a Review</Button>
+                        </Link>
+                    </div>
 
                     {averageRating && (
                         <p className="text-sm text-muted-foreground">
@@ -137,14 +154,6 @@ export default function ProfessorReviewsPage() {
                 </header>
 
                 <Separator />
-
-                <div>
-                    <Link href="/professors">
-                        <Button variant="outline">
-                            Back to Professor Search
-                        </Button>
-                    </Link>
-                </div>
 
                 {!loading && !error && reviews.length > 0 && (
                     <Card>
@@ -260,6 +269,8 @@ export default function ProfessorReviewsPage() {
                                 <CardDescription>
                                     {review.course_id} ·{" "}
                                     {review.rating}/5
+                                    {" · "}
+                                    {review.author_name ?? "Anonymous"}
                                 </CardDescription>
                             </CardHeader>
 
