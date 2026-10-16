@@ -8,7 +8,7 @@ import {
   type SyntheticEvent,
 } from "react";
 
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 const MIN_WIDTH = 320;
@@ -28,6 +28,9 @@ type ChatResponse = {
 
 export default function AssistantWidget() {
   const pathname = usePathname();
+  const params = useParams<{ courseId?: string }>();
+  const courseId = params.courseId;
+
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [resizing, setResizing] = useState(false);
@@ -111,6 +114,7 @@ export default function AssistantWidget() {
         },
         body: JSON.stringify({
           question,
+          ...(courseId ? { course_id: courseId } : {}),
         }),
       });
 
@@ -170,7 +174,7 @@ export default function AssistantWidget() {
             <div>
               <h2 className="font-semibold">StudySync AI</h2>
               <p className="text-sm text-muted-foreground">
-                Context: Auto
+                Context: {courseId ?? "General"}
               </p>
             </div>
 
