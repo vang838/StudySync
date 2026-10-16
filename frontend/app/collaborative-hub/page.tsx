@@ -23,17 +23,22 @@ export default function CollaborativeHub() {
   useEffect(() => {
     async function loadSavedCourses() {
       try {
-        const rawUser = localStorage.getItem("studysync_user");
-
-        if (!rawUser) {
-            throw new Error("User is not logged in.");
-        }
-
-        const user = JSON.parse(rawUser);
-        const userId = Number(user.user_id);
+        const storedUserId = localStorage.getItem("user_id");
+        let userId = Number(storedUserId);
 
         if (!Number.isInteger(userId) || userId <= 0) {
-            throw new Error("Invalid user ID.");
+          const rawUser = localStorage.getItem("studysync_user");
+
+          if (!rawUser) {
+            throw new Error("User is not logged in.");
+          }
+
+          const user = JSON.parse(rawUser);
+          userId = Number(user?.user_id);
+        }
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+          throw new Error("Invalid user ID.");
         }
 
         const response = await fetch(
