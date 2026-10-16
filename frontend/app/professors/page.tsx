@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -105,24 +105,22 @@ export default function ProfessorSearchPage() {
         );
     }, [professors]);
 
-    async function fetchProfessorPage() {
-        if (!submittedQuery) {
-            return;
-        }
-
-        setLoading(true);
-        setError(null);
-
+    async function fetchProfessorPage(
+        query: string,
+        pageNumber: number,
+        rating: string,
+        courseId: string,
+    ) {
         try {
             const url = new URL("/api/professor-reviews/search", window.location.origin);
-            url.searchParams.set("q", submittedQuery);
-            url.searchParams.set("page", String(page));
+            url.searchParams.set("q", query);
+            url.searchParams.set("page", String(pageNumber));
             url.searchParams.set("per_page", String(PAGE_SIZE));
-            if (ratingFilter !== "all") {
-                url.searchParams.set("rating", ratingFilter);
+            if (rating !== "all") {
+                url.searchParams.set("rating", rating);
             }
-            if (courseFilter !== "all") {
-                url.searchParams.set("course_id", courseFilter);
+            if (courseId !== "all") {
+                url.searchParams.set("course_id", courseId);
             }
 
             const response = await fetch(url.toString());
@@ -148,6 +146,7 @@ export default function ProfessorSearchPage() {
             setReviews({});
             setTotalCount(0);
             setTotalPages(1);
+            setPage(1);
         } finally {
             setLoading(false);
         }
@@ -164,21 +163,13 @@ export default function ProfessorSearchPage() {
             return;
         }
 
+        setLoading(true);
+        setError(null);
         setSearched(true);
         setSubmittedQuery(professorName);
-        if (page !== 1) {
-            setPage(1);
-        }
+        setPage(1);
+        void fetchProfessorPage(professorName, 1, ratingFilter, courseFilter);
     }
-
-    useEffect(() => {
-        if (!searched || !submittedQuery) {
-            return;
-        }
-        void fetchProfessorPage();
-        // Intentionally depending on search and filter controls to refetch server-side.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searched, submittedQuery, page, ratingFilter, courseFilter]);
 
     return (
         <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
@@ -243,8 +234,14 @@ export default function ProfessorSearchPage() {
                                     id="rating-filter"
                                     value={ratingFilter}
                                     onChange={(e) => {
-                                        setRatingFilter(e.target.value);
+                                        const nextRating = e.target.value;
+                                        setLoading(true);
+                                        setError(null);
+                                        setRatingFilter(nextRating);
                                         setPage(1);
+                                        if (searched && submittedQuery) {
+                                            void fetchProfessorPage(submittedQuery, 1, nextRating, courseFilter);
+                                        }
                                     }}
                                     className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                                 >
@@ -266,8 +263,14 @@ export default function ProfessorSearchPage() {
                                     id="course-filter"
                                     value={courseFilter}
                                     onChange={(e) => {
-                                        setCourseFilter(e.target.value);
+                                        const nextCourse = e.target.value;
+                                        setLoading(true);
+                                        setError(null);
+                                        setCourseFilter(nextCourse);
                                         setPage(1);
+                                        if (searched && submittedQuery) {
+                                            void fetchProfessorPage(submittedQuery, 1, ratingFilter, nextCourse);
+                                        }
                                     }}
                                     className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                                 >
@@ -372,7 +375,13 @@ export default function ProfessorSearchPage() {
                                 <button
                                     key={`page-${item}`}
                                     type="button"
-                                    onClick={() => setPage(item)}
+                                    onClick={() => {
+                                        const nextPage = Number(item);
+                                        setLoading(true);
+                                        setError(null);
+                                        setPage(nextPage);
+                                        void fetchProfessorPage(submittedQuery, nextPage, ratingFilter, courseFilter);
+                                    }}
                                     disabled={isActive}
                                     className={`text-sm ${
                                         isActive
@@ -386,7 +395,13 @@ export default function ProfessorSearchPage() {
                         })}
                         <button
                             type="button"
-                            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                            onClick={() => {
+                                const nextPage = Math.min(totalPages, page + 1);
+                                setLoading(true);
+                                setError(null);
+                                setPage(nextPage);
+                                void fetchProfessorPage(submittedQuery, nextPage, ratingFilter, courseFilter);
+                            }}
                             disabled={page >= totalPages}
                             className="text-sm text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
                         >

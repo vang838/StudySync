@@ -24,11 +24,6 @@ type ProfessorReview = {
     created_at: string;
 };
 
-type Course = {
-    course_id: string;
-    title: string;
-};
-
 export default function ProfessorReviewsPage() {
     const params = useParams<{ professor: string }>();
 

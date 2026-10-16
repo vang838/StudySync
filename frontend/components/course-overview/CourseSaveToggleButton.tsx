@@ -18,30 +18,6 @@ const CourseSaveToggleButton = ({ courseId }: CourseSaveToggleButtonProps) => {
     return Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : 1;
   }, []);
 
-  const loadSavedState = useCallback(async () => {
-    setLoading(true);
-    try {
-      const userId = getCurrentUserId();
-      const response = await fetch(`/api/courses/saved?user_id=${userId}`);
-      if (!response.ok) {
-        setIsSaved(false);
-        return;
-      }
-
-      const savedCourses = await response.json();
-      const savedIds = Array.isArray(savedCourses)
-        ? savedCourses
-            .map((course: { course_id?: string; id?: string }) => course.course_id ?? course.id)
-            .filter((value): value is string => typeof value === "string")
-        : [];
-      setIsSaved(savedIds.includes(courseId));
-    } catch {
-      setIsSaved(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [courseId, getCurrentUserId]);
-
   const toggleSave = useCallback(async () => {
     if (saving) {
       return;
@@ -63,8 +39,47 @@ const CourseSaveToggleButton = ({ courseId }: CourseSaveToggleButtonProps) => {
   }, [courseId, getCurrentUserId, isSaved, saving]);
 
   useEffect(() => {
+    let isActive = true;
+
+    async function loadSavedState() {
+      try {
+        const userId = getCurrentUserId();
+        const response = await fetch(`/api/courses/saved?user_id=${userId}`);
+        if (!isActive) {
+          return;
+        }
+        if (!response.ok) {
+          setIsSaved(false);
+          return;
+        }
+
+        const savedCourses = await response.json();
+        if (!isActive) {
+          return;
+        }
+        const savedIds = Array.isArray(savedCourses)
+          ? savedCourses
+              .map((course: { course_id?: string; id?: string }) => course.course_id ?? course.id)
+              .filter((value): value is string => typeof value === "string")
+          : [];
+        setIsSaved(savedIds.includes(courseId));
+      } catch {
+        if (isActive) {
+          setIsSaved(false);
+        }
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    }
+
     void loadSavedState();
-  }, [loadSavedState]);
+
+    return () => {
+      isActive = false;
+    };
+  }, [courseId, getCurrentUserId]);
 
   return (
     <Button

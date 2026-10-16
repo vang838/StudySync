@@ -234,6 +234,8 @@ export default function UserProfilePage({
         setSavedCourses(normalizedCourseData);
         setBookmarkedPosts(flattenedBookmarkedPosts);
         setDiscussionActivityPosts(discussionActivity);
+        setBookmarkedPage(1);
+        setActivityPage(1);
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : "Unable to load profile.";
         setError(message);
@@ -292,14 +294,6 @@ export default function UserProfilePage({
     () => getPaginationItems(activityPage, activityTotalPages),
     [activityPage, activityTotalPages],
   );
-
-  useEffect(() => {
-    setBookmarkedPage(1);
-  }, [resolvedUserId, bookmarkedPosts.length, bookmarkedSearchQuery]);
-
-  useEffect(() => {
-    setActivityPage(1);
-  }, [resolvedUserId, discussionActivityPosts.length, activitySearchQuery]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading profile...</p>;
@@ -394,7 +388,10 @@ export default function UserProfilePage({
                 <div className="mb-3">
                   <Input
                     value={bookmarkedSearchQuery}
-                    onChange={(event) => setBookmarkedSearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setBookmarkedSearchQuery(event.target.value);
+                      setBookmarkedPage(1);
+                    }}
                     placeholder="Search bookmarked posts"
                     className="w-full"
                   />
@@ -476,7 +473,10 @@ export default function UserProfilePage({
                 <div className="mb-3">
                   <Input
                     value={activitySearchQuery}
-                    onChange={(event) => setActivitySearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setActivitySearchQuery(event.target.value);
+                      setActivityPage(1);
+                    }}
                     placeholder="Search discussion activity"
                     className="w-full"
                   />

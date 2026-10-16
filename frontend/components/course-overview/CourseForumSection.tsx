@@ -492,7 +492,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     return "No discussion threads yet.";
   }, [discussionFilter, searchQuery]);
 
-  const renderForumSidebarPanel = (showHeaderAction: boolean): React.ReactNode => (
+  const renderForumSidebarPanel = (): React.ReactNode => (
     <Card>
       <CardHeader>
         <CardTitle>Discussion Forum</CardTitle>
@@ -635,7 +635,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
   );
 
   if (!focusMode) {
-    return <>{renderForumSidebarPanel(false)}</>;
+    return <>{renderForumSidebarPanel()}</>;
   }
 
   return (
@@ -658,7 +658,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
         </Card>
       </section>
       <aside className="space-y-6 lg:col-span-4">
-        {renderForumSidebarPanel(true)}
+        {renderForumSidebarPanel()}
       </aside>
     </div>
   );
