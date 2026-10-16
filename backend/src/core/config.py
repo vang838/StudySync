@@ -10,17 +10,38 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     database_url: str = Field(default="", alias="DATABASE_URL")
     cors_origins_raw: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+
     pinecone_api_key: str = Field(default="", alias="PINECONE_API_KEY")
     pinecone_index_name: str = Field(default="", alias="PINECONE_INDEX_NAME")
     pinecone_namespace: str = Field(default="", alias="PINECONE_NAMESPACE")
+    pinecone_batch_size: int = Field(default=50,gt=0,le=1000,alias="PINECONE_BATCH_SIZE")
 
     ai_base_url: str = Field(default="http://127.0.0.1:11434", alias="AI_BASE_URL")
     ai_provider: str = Field(default="ollama", alias="AI_PROVIDER")
     ai_model: str = Field(default="qwen3:14b", alias="AI_MODEL")
     ai_timeout: float = Field(default=120.0,gt=0,alias="AI_TIMEOUT")
 
-    embedding_model: str = Field(default="", alias="EMBEDDING_MODEL")
+    embedding_provider: str = Field(default="ollama", alias="EMBEDDING_PROVIDER")
+    embedding_base_url: str = Field(default="http://127.0.0.1:11434", alias="EMBEDDING_BASE_URL")
+    embedding_model: str = Field(default="qwen3-embedding:0.6b", alias="EMBEDDING_MODEL")
+    embedding_dimension: int = Field(default=1024, gt=0, alias="EMBEDDING_DIMENSION")
+    embedding_timeout: float = Field(default=120.0, gt=0, alias="EMBEDDING_TIMEOUT")
+    embedding_batch_size: int = Field(default=32,gt=0,alias="EMBEDDING_BATCH_SIZE")
+
     jwt_secret: str = Field(default="", alias="JWT_SECRET")
+
+    r2_endpoint_url: str | None = Field(default=None, alias="R2_ENDPOINT_URL")
+    r2_access_key_id: str | None = Field(default=None, alias="R2_ACCESS_KEY_ID")
+    r2_secret_access_key: str | None = Field(default=None, alias="R2_SECRET_ACCESS_KEY")
+    r2_bucket_name: str | None = Field(default=None, alias="R2_BUCKET_NAME")
+
+    document_max_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0, alias="DOCUMENT_MAX_UPLOAD_BYTES")
+    document_chunk_max_words: int = Field(default=300, gt=0, alias="DOCUMENT_CHUNK_MAX_WORDS")
+    document_chunk_overlap_words: int = Field(default=50, ge=0, alias="DOCUMENT_CHUNK_OVERLAP_WORDS")
+    uwm_catalog_sync_on_startup: bool = Field(default=False, alias="UWM_CATALOG_SYNC_ON_STARTUP")  ################ Enable catalog sync on startup, this can be disabled during development or testing
+    uwm_catalog_base_url: str = Field(default="https://catalog.uwm.edu", alias="UWM_CATALOG_BASE_URL")
+    uwm_catalog_timeout_seconds: float = Field(default=20.0, gt=1.0, alias="UWM_CATALOG_TIMEOUT_SECONDS")
+    uwm_catalog_max_subjects: int | None = Field(default=None, ge=1, alias="UWM_CATALOG_MAX_SUBJECTS")
 
     @property
     def cors_origins(self) -> list[str]:

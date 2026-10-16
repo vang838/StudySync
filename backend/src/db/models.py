@@ -1,6 +1,15 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.base import Base
@@ -8,6 +17,51 @@ from src.db.base import Base
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True,autoincrement=True)
+    user_first_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_last_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_email: Mapped[str] = mapped_column(String(128), unique=True, index=True,nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(258),nullable=False)
+    forum_points_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    saved_courses: Mapped[list["Course"]] = relationship(
+        "Course",
+        secondary="course_members",
+        back_populates="members",
+    )
+    forum_posts: Mapped[list["CourseForumPost"]] = relationship(
+        "CourseForumPost",
+        back_populates="author",
+        cascade="all, delete-orphan",
+    )
+    forum_post_bookmarks: Mapped[list["CourseForumPostBookmark"]] = relationship(
+        "CourseForumPostBookmark",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    forum_post_likes: Mapped[list["CourseForumPostLike"]] = relationship(
+        "CourseForumPostLike",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    forum_point_transactions: Mapped[list["ForumPointTransaction"]] = relationship(
+        "ForumPointTransaction",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    user_reviews: Mapped[list["ProfessorReview"]] = relationship(
+        "ProfessorReview",
+        back_populates="author",
+        cascade="all, delete-orphan",
+    )
 
 
 class ChatThreadRecord(Base):
@@ -35,5 +89,346 @@ class ChatMessageRecord(Base):
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
-
     thread: Mapped["ChatThreadRecord"] = relationship(back_populates="messages")
+
+class Course(Base):
+    __tablename__ = "courses"
+
+    course_id: Mapped[str] = mapped_column(String(128), primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    professor: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    subject: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    members: Mapped[list["User"]] = relationship(
+        "User",
+        secondary="course_members",
+        back_populates="saved_courses",
+    )
+
+    forum_posts: Mapped[list["CourseForumPost"]] = relationship(
+        "CourseForumPost",
+        back_populates="course",
+        cascade="all, delete-orphan",
+    )
+
+
+class ProfessorReview(Base):
+    __tablename__ = "professor_reviews"
+    __table_args__ = (
+        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_professor_review_rating"),
+        UniqueConstraint(
+            "user_id",
+            "professor",
+            "course_id",
+            name="uq_professor_review_user_professor_course",
+        ),
+    )
+
+    review_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+
+    professor: Mapped[str] = mapped_column(
+        String(200), index=True, nullable=False
+    )
+
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.course_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+
+    author: Mapped["User | None"] = relationship(back_populates="user_reviews")
+
+    rating: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )
+
+    feedback: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+
+class UserCourseSave(Base):
+    __tablename__ = "course_members"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_id", name="uq_user_course_save"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.course_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+
+class CourseForumPost(Base):
+    __tablename__ = "course_forum_posts"
+
+    post_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.course_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    parent_post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    course: Mapped["Course"] = relationship(back_populates="forum_posts")
+    author: Mapped["User"] = relationship(back_populates="forum_posts")
+    parent_post: Mapped["CourseForumPost | None"] = relationship(
+        "CourseForumPost",
+        remote_side="CourseForumPost.post_id",
+        back_populates="replies",
+    )
+    replies: Mapped[list["CourseForumPost"]] = relationship(
+        "CourseForumPost",
+        back_populates="parent_post",
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
+    bookmarks: Mapped[list["CourseForumPostBookmark"]] = relationship(
+        "CourseForumPostBookmark",
+        back_populates="post",
+        cascade="all, delete-orphan",
+    )
+    likes: Mapped[list["CourseForumPostLike"]] = relationship(
+        "CourseForumPostLike",
+        back_populates="post",
+        cascade="all, delete-orphan",
+    )
+
+
+class CourseForumPostBookmark(Base):
+    __tablename__ = "course_forum_post_bookmarks"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "post_id", name="uq_forum_post_bookmark_user_post"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="forum_post_bookmarks")
+    post: Mapped["CourseForumPost"] = relationship(back_populates="bookmarks")
+
+
+class CourseForumPostLike(Base):
+    __tablename__ = "course_forum_post_likes"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "post_id", name="uq_forum_post_like_user_post"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="forum_post_likes")
+    post: Mapped["CourseForumPost"] = relationship(back_populates="likes")
+
+
+class ForumPointTransaction(Base):
+    __tablename__ = "forum_point_transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    delta_points: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    related_post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course_forum_posts.post_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="forum_point_transactions")
+      
+class DocumentRecord(Base):
+    __tablename__ = "documents"
+
+    document_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    course_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    owner_ref: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    versions: Mapped[list["DocumentVersionRecord"]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="DocumentVersionRecord.version_number",
+    )
+
+class DocumentVersionRecord(Base):
+    __tablename__ = "document_versions"
+
+    __table_args__ = (
+        UniqueConstraint("document_id", "version_number", name="uq_document_version_number"),
+        CheckConstraint("version_number >= 1", name="ck_document_version_positive"),
+        CheckConstraint("file_size_bytes >= 0", name="ck_document_file_size_nonnegative"),
+    )
+
+    version_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.document_id", ondelete="CASCADE"), index=True, nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    declared_media_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    detected_media_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    file_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    content_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+
+    object_key: Mapped[str] = mapped_column(String(1024), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    document: Mapped["DocumentRecord"] = relationship(back_populates="versions")
+
+    ingestion_jobs: Mapped[list["IngestionJobRecord"]] = relationship(
+        back_populates="document_version",
+        cascade="all, delete-orphan",
+        order_by="IngestionJobRecord.created_at",
+    )
+
+class IngestionJobRecord(Base):
+    __tablename__ = "ingestion_jobs"
+
+    __table_args__ = (
+        CheckConstraint("retry_count >= 0", name="ck_ingestion_retry_nonnegative"),
+    )
+
+    job_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    version_id: Mapped[str] = mapped_column(ForeignKey("document_versions.version_id", ondelete="CASCADE"), index=True, nullable=False)
+
+    status: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    current_stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pipeline_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failure_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    document_version: Mapped["DocumentVersionRecord"] = relationship(back_populates="ingestion_jobs")
+
+    chunks: Mapped[list["DocumentChunkRecord"]] = relationship(
+        back_populates="ingestion_job",
+        cascade="all, delete-orphan",
+        order_by="DocumentChunkRecord.chunk_index",
+    )
+
+class DocumentChunkRecord(Base):
+    __tablename__ = "document_chunks"
+
+    __table_args__ = (
+        UniqueConstraint("job_id", "chunk_index", name="uq_ingestion_chunk_index"),
+        CheckConstraint("chunk_index >= 0", name="ck_document_chunk_index_nonnegative"),
+    )
+
+    chunk_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    job_id: Mapped[str] = mapped_column(ForeignKey("ingestion_jobs.job_id", ondelete="CASCADE"), index=True, nullable=False)
+
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    source_start_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_end_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_start_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_end_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    page_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    page_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    section_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    ingestion_job: Mapped["IngestionJobRecord"] = relationship(back_populates="chunks")

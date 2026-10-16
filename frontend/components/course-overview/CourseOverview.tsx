@@ -1,0 +1,113 @@
+"use client";
+
+import Link from "next/link";
+import React, { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import CourseForumSection from "@/components/course-overview/CourseForumSection";
+import CourseMembersSection from "@/components/course-overview/CourseMembersSection";
+
+type CourseDetails = {
+  course_id: string;
+  title: string;
+  description?: string | null;
+  professor?: string | null;
+  subject: string;
+  year: number;
+};
+
+interface CourseOverviewProps {
+  courseId: string;
+}
+
+const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
+  const [course, setCourse] = useState<CourseDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadCourse = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`/api/courses/${encodeURIComponent(courseId)}`);
+        if (!response.ok) {
+          throw new Error(`Failed to load course data (HTTP ${response.status})`);
+        }
+
+        const data = (await response.json()) as CourseDetails;
+        setCourse(data);
+      } catch (loadError) {
+        const message = loadError instanceof Error ? loadError.message : "Unable to load course details.";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadCourse();
+  }, [courseId]);
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Loading course overview...</p>;
+  }
+
+  if (error) {
+    return <p className="text-sm font-medium text-destructive">{error}</p>;
+  }
+
+  if (!course) {
+    return <p className="text-sm text-muted-foreground">No course data found.</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <aside className="space-y-6 lg:col-span-3">
+        <CourseMembersSection courseId={courseId} />
+      </aside>
+
+      <section className="space-y-6 lg:col-span-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>{course.title}</CardTitle>
+            <CardDescription>{course.course_id} · {course.subject} · {course.year}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>{course.description || "No description provided for this course yet."}</p>
+            <Separator />
+            <div>
+              <p className="text-xs font-medium tracking-wide text-muted-foreground">Professor</p>
+              {course.professor ? (
+                <Link
+                  href={`/professors/${encodeURIComponent(course.professor)}`}
+                  className="mt-1 inline-block text-base text-primary underline-offset-2 hover:underline"
+                >
+                  {course.professor}
+                </Link>
+              ) : (
+                <p className="mt-1 text-base text-foreground">TBA</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Materials</CardTitle>
+            <CardDescription>Course files and links shared by instructors.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">No materials uploaded yet.</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <aside className="space-y-6 lg:col-span-3">
+        <CourseForumSection courseId={courseId} />
+      </aside>
+    </div>
+  );
+};
+
+export default CourseOverview;
