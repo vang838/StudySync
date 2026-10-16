@@ -1,172 +1,239 @@
+
 "use client";
 
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
-type UserProfile = {
-  user_id: number;
-  first_name: string;
-  last_name: string;
-  full_name: string;
-  email: string;
-};
-
-type SavedCourse = {
+type Course = {
   course_id: string;
   title: string;
-  description?: string | null;
-  professor?: string | null;
-  subject: string;
-  year: number;
+  subject?: string;
 };
 
-export default function UserProfilePage({
-  params,
-}: {
-  params: Promise<{ userId: string }>;
-}) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
+export default function UploadDocumentsPage() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [courseId, setCourseId] = useState("");
+  const [title, setTitle] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
   useEffect(() => {
-    const loadProfile = async () => {
-      const { userId } = await params;
-      setResolvedUserId(userId);
-      setLoading(true);
-      setError(null);
-
+    async function loadCourses() {
       try {
-        const [userResponse, coursesResponse] = await Promise.all([
-          fetch(`/api/users/${encodeURIComponent(userId)}`),
-        fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
-        ]);
+        const rawUser = localStorage.getItem("studysync_user");
 
-        if (!userResponse.ok) {
-          const body = await userResponse.json().catch(() => ({}));
-          throw new Error(body?.detail ?? `Failed to load user profile (HTTP ${userResponse.status})`);
+        if (!rawUser) {
+          throw new Error("Please sign in first.");
         }
 
-        if (!coursesResponse.ok) {
-          const body = await coursesResponse.json().catch(() => ({}));
-          throw new Error(body?.detail ?? `Failed to load saved courses (HTTP ${coursesResponse.status})`);
+        const user = JSON.parse(rawUser);
+        const userId = Number(user.user_id);
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+          throw new Error("Invalid user ID.");
         }
 
-        const userData = (await userResponse.json()) as UserProfile;
-        const courseData = (await coursesResponse.json()) as SavedCourse[];
-        setUser(userData);
-        setSavedCourses(Array.isArray(courseData) ? courseData : []);
-      } catch (loadError) {
-        const message = loadError instanceof Error ? loadError.message : "Unable to load profile.";
-        setError(message);
+        const response = await fetch(
+          `/api/courses/saved?user_id=${userId}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load saved courses.");
+        }
+
+        const data: unknown = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid course data.");
+        }
+
+        setCourses(data as Course[]);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load saved courses."
+        );
       } finally {
-        setLoading(false);
+        setLoadingCourses(false);
       }
-    };
+    }
 
-    void loadProfile();
-  }, [params]);
+    loadCourses();
+  }, []);
 
-  const savedCourseCount = useMemo(() => savedCourses.length, [savedCourses]);
+  async function handleUpload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
 
-  if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading profile...</p>;
-  }
+    if (!courseId || !title.trim() || !file) {
+      setError("Please select a course, enter a title, and choose a file.");
+      return;
+    }
 
-  if (error) {
-    return <p className="text-sm font-medium text-destructive">{error}</p>;
-  }
+    const allowedExtensions = [".pdf", ".docx", ".pptx", ".txt"];
+    const extension = file.name
+      .slice(file.name.lastIndexOf("."))
+      .toLowerCase();
 
-  if (!user) {
-    return <p className="text-sm text-muted-foreground">No profile data found.</p>;
+    if (!allowedExtensions.includes(extension)) {
+      setError("Supported formats: PDF, DOCX, PPTX, and TXT.");
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setError("File size must not exceed 25 MB.");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("course_id", courseId);
+      formData.append("title", title.trim());
+      formData.append("file", file);
+
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail ?? "Upload failed.");
+      }
+
+      setSuccess(
+        `Document uploaded successfully. Status: ${result.status}`
+      );
+      setTitle("");
+      setFile(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Upload failed."
+      );
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
-    <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-10 pb-10">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium text-muted-foreground">Student Profile</p>
-            <h1 className="font-heading text-3xl font-bold">{user.full_name}</h1>
-            <p className="text-sm text-muted-foreground">User ID: {resolvedUserId ?? user.user_id}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/courses/course_search">
-              <Button variant="secondary" size="s">Back to Catalog</Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button size="s">Dashboard</Button>
-            </Link>
-          </div>
+    <main className="min-h-screen bg-background px-6 py-8 text-foreground md:px-10">
+      <div className="mx-auto max-w-3xl">
+        <header className="mb-8">
+          <p className="text-sm text-muted-foreground">
+            Document Management
+          </p>
+          <h1 className="mt-1 text-3xl font-bold">
+            Upload Course Documents
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Upload your study materials and associate them with
+            your saved courses.
+          </p>
         </header>
 
-        <Separator />
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <form onSubmit={handleUpload} className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="course" className="block font-medium">
+                Course
+              </label>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <section className="space-y-6 lg:col-span-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Details</CardTitle>
-                <CardDescription>Basic account information for this course member.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <div>
-                  <p className="text-xs font-medium tracking-wide text-muted-foreground">Name</p>
-                  <p className="mt-1 text-base text-foreground">{user.full_name}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium tracking-wide text-muted-foreground">Email</p>
-                  <p className="mt-1 text-base text-foreground">{user.email}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium tracking-wide text-muted-foreground">Saved courses</p>
-                  <p className="mt-1 text-base text-foreground">{savedCourseCount}</p>
-                </div>
-              </CardContent>
-            </Card>
+              <select
+                id="course"
+                value={courseId}
+                onChange={(event) => setCourseId(event.target.value)}
+                disabled={loadingCourses || uploading}
+                required
+                className="w-full rounded-md border bg-background p-3"
+              >
+                <option value="">
+                  {loadingCourses
+                    ? "Loading courses..."
+                    : "Select a saved course"}
+                </option>
+                {courses.map((course) => (
+                  <option key={course.course_id} value={course.course_id}>
+                    {course.course_id} - {course.title}
+                  </option>
+                ))}
+              </select>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Saved Courses</CardTitle>
-                <CardDescription>Courses this student has bookmarked or joined.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {savedCourses.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No saved courses yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {savedCourses.map((course) => (
-                      <Link key={course.course_id} href={`/courses/${encodeURIComponent(course.course_id)}`} className="block">
-                        <div className="rounded-md border border-border/60 bg-card p-3 transition hover:border-secondary hover:shadow-sm">
-                          <p className="text-sm font-medium text-foreground">{course.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {course.course_id} · {course.subject} · {course.year}
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          <aside className="space-y-6 lg:col-span-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>About</CardTitle>
-              </CardHeader>
-              <CardContent>
+              {!loadingCourses && courses.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  This profile shows the member&apos;s course activity and saved classes.
+                  No saved courses found.{" "}
+                  <Link href="/courses/course_search" className="underline">
+                    Browse Courses
+                  </Link>
                 </p>
-              </CardContent>
-            </Card>
-          </aside>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="title" className="block font-medium">
+                Document Title
+              </label>
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                maxLength={200}
+                required
+                disabled={uploading}
+                placeholder="e.g. Week 3 Lecture Notes"
+                className="w-full rounded-md border bg-background p-3"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="file" className="block font-medium">
+                Choose File
+              </label>
+              <input
+                id="file"
+                type="file"
+                accept=".pdf,.docx,.pptx,.txt"
+                onChange={(event) =>
+                  setFile(event.target.files?.[0] ?? null)
+                }
+                disabled={uploading}
+                required
+                className="w-full rounded-md border bg-background p-3"
+              />
+              <p className="text-sm text-muted-foreground">
+                PDF, DOCX, PPTX, or TXT. Maximum 25 MB.
+              </p>
+            </div>
+
+            {error && (
+              <p role="alert" className="text-sm text-red-500">
+                {error}
+              </p>
+            )}
+
+            {success && (
+              <p role="status" className="text-sm text-green-600">
+                {success}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={uploading || loadingCourses || courses.length === 0}
+              className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {uploading ? "Uploading..." : "Upload Document"}
+            </button>
+          </form>
         </div>
       </div>
     </main>
