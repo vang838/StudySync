@@ -15,10 +15,11 @@ import {
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import StudyCalendar from "@/components/dashboard/StudyCalendar";
+import {useStudyTasks} from "@/components/dashboard/StudyTasksProvider";
 
 const courses = [
     {code: "BIO 201", name: "Human Biology", progress: 72},
@@ -65,7 +66,8 @@ function getSavedCoursesSnapshot() {
 
 function subscribeToSavedCourses(onStoreChange: () => void) {
     if (typeof window === "undefined") {
-        return () => {};
+        return () => {
+        };
     }
 
     const handleStorageChange = (event: StorageEvent) => {
@@ -99,24 +101,6 @@ const uploads = [
     },
 ];
 
-const tasks = [
-    {
-        title: "Review cell structure",
-        course: "Human Biology",
-        due: "Sep 25",
-    },
-    {
-        title: "Practice probability problems",
-        course: "Statistics & Probability",
-        due: "Sep 27",
-    },
-    {
-        title: "Summarize lecture notes",
-        course: "World History",
-        due: "Sep 29",
-    },
-];
-
 const quickActions = [
     {
         title: "My courses",
@@ -144,16 +128,6 @@ const quickActions = [
     },
 ];
 
-const week = [
-    {day: "Mon", date: 21, activity: ""},
-    {day: "Tue", date: 22, activity: "Notes uploaded"},
-    {day: "Wed", date: 23, activity: ""},
-    {day: "Thu", date: 24, activity: ""},
-    {day: "Fri", date: 25, activity: "Biology review"},
-    {day: "Sat", date: 26, activity: ""},
-    {day: "Sun", date: 27, activity: "Math practice"},
-];
-
 function SectionHeading({
                             eyebrow,
                             title,
@@ -174,6 +148,12 @@ function SectionHeading({
 }
 
 export default function StudentDashboardPage() {
+    const {tasks, toggleTask} = useStudyTasks();
+    const upcomingTasks = tasks
+        .filter((task) => !task.completed)
+        .sort((first, second) => first.dueDate.localeCompare(second.dueDate))
+        .slice(0, 5);
+
     const savedCourses = useSyncExternalStore(
         subscribeToSavedCourses,
         getSavedCoursesSnapshot,
@@ -401,18 +381,27 @@ export default function StudentDashboardPage() {
 
                             <Card className="gap-0">
                                 <CardContent className="divide-y divide-foreground/10">
-                                    {tasks.map((task) => (
+                                    {upcomingTasks.length === 0 && (
+                                        <p className="text-sm text-muted-foreground">
+                                            No upcoming tasks yet. Open the calendar to add one.
+                                        </p>
+                                    )}
+                                    {upcomingTasks.map((task) => (
                                         <div
-                                            key={task.title}
+                                            key={task.id}
                                             className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
                                         >
-                      <span
-                          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-secondary">
-                        <HugeiconsIcon
-                            icon={CheckmarkCircle01Icon}
-                            size={18}
-                        />
-                      </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleTask(task.id)}
+                                                aria-label={`Mark ${task.title} complete`}
+                                                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-secondary hover:bg-muted focus-visible:outline-2 focus-visible:outline-secondary"
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={CheckmarkCircle01Icon}
+                                                    size={18}
+                                                />
+                                            </button>
 
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-medium">
@@ -423,9 +412,15 @@ export default function StudentDashboardPage() {
                                                 </p>
                                             </div>
 
-                                            <span className="shrink-0 text-xs font-medium">
-                        {task.due}
-                      </span>
+                                            <time
+                                                dateTime={task.dueDate}
+                                                className="shrink-0 text-xs font-medium"
+                                            >
+                                                {new Date(`${task.dueDate}T00:00:00`).toLocaleDateString(undefined, {
+                                                    month: "short",
+                                                    day: "numeric",
+                                                })}
+                                            </time>
                                         </div>
                                     ))}
                                 </CardContent>
@@ -442,55 +437,7 @@ export default function StudentDashboardPage() {
                             title="Planner / calendar"
                         />
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Sep 21–27, 2026</CardTitle>
-                                <CardDescription>
-                                    Sample week
-                                </CardDescription>
-                            </CardHeader>
-
-                            <CardContent className="overflow-x-auto">
-                                <div className="grid min-w-[260px] grid-cols-7 gap-1 text-center">
-                                    {week.map((day) => (
-                                        <div
-                                            key={day.day}
-                                            className="flex flex-col items-center gap-2"
-                                        >
-                      <span className="text-xs text-muted-foreground">
-                        {day.day}
-                      </span>
-                                            <span
-                                                className={
-                                                    "flex size-8 items-center justify-center rounded-full text-xs font-medium " +
-                                                    (day.activity
-                                                        ? "bg-secondary text-secondary-foreground"
-                                                        : "bg-background")
-                                                }
-                                            >
-                        {day.date}
-                      </span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-5 space-y-2 border-t border-foreground/10 pt-4">
-                                    {week
-                                        .filter((day) => day.activity)
-                                        .map((day) => (
-                                            <p
-                                                key={day.date}
-                                                className="flex justify-between gap-3 text-xs"
-                                            >
-                                                <span>{day.activity}</span>
-                                                <span className="text-muted-foreground">
-                          Sep {day.date}
-                        </span>
-                                            </p>
-                                        ))}
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <StudyCalendar/>
                     </section>
                 </div>
             </div>
