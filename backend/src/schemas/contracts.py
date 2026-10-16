@@ -77,7 +77,7 @@ class DocumentUploadResponse(BaseModel):
 
 
 class ChatCreateRequest(BaseModel):
-    course_id: str
+    course_id: str | None = None
     question: str = Field(min_length=1)
 
 
@@ -89,7 +89,7 @@ class ChatMessage(BaseModel):
 
 class ChatThread(BaseModel):
     chat_id: str
-    course_id: str
+    course_id: str | None
     question: str
     answer: str
     created_at: datetime
@@ -98,4 +98,4 @@ class ChatThread(BaseModel):
 
 
 class ChatCreateResponse(ChatThread):
-    pass
+    mode: Literal["general", "course"]
