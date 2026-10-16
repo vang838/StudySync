@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
     }
 
     const uploadData = new FormData();
-    uploadData.append("course_id", courseId);
-    uploadData.append("title", title);
+    uploadData.append("course_id", courseId.trim());
+    uploadData.append("title", title.trim());
     uploadData.append("file", file, file.name);
 
     const targetUrl = new URL("/api/v1/documents", backendBaseUrl);
