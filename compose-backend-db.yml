@@ -25,6 +25,24 @@ services:
       timeout: 5s
       retries: 5
 
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: studysync-searxng
+    restart: unless-stopped
+
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?SEARXNG_SECRET is required}
+
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    volumes:
+      - ./infra/searxng:/etc/searxng
+      - searxng_cache:/var/cache/searxng
+
 volumes:
   postgres_data:
     name: studysync-postgres-data
+
+  searxng_cache:
+    name: studysync-searxng-cache

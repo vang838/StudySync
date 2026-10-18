@@ -1,5 +1,5 @@
+from typing import Annotated, Literal
 from pydantic import BaseModel, Field
-
 
 class ChunkRetrievalMetadata(BaseModel):
     document_id: str
@@ -21,3 +21,21 @@ class ChunkRetrievalMetadata(BaseModel):
 
     def to_vector_metadata(self) -> dict[str, str | int | bool]:
         return self.model_dump(exclude_none=True)
+
+class InternalEvidenceSource(BaseModel):
+    source_type: Literal["internal"] = "internal"
+    metadata: ChunkRetrievalMetadata
+
+class ExternalEvidenceSource(BaseModel):
+    source_type: Literal["external"] = "external"
+    provider: str = Field(min_length=1)
+    title: str | None = None
+    url: str = Field(min_length=1)
+
+EvidenceSource = Annotated[InternalEvidenceSource | ExternalEvidenceSource, Field(discriminator="source_type")]
+
+class Evidence(BaseModel):
+    text: str = Field(min_length=1)
+    score: float | None = None
+    rank_score: float | None = None
+    source: EvidenceSource
