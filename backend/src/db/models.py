@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -181,6 +182,11 @@ class UserCourseSave(Base):
         ForeignKey("courses.course_id", ondelete="CASCADE"),
         index=True,
         nullable=False,
+    )
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
