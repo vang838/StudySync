@@ -54,42 +54,56 @@ export default function AssistantWidget() {
     setSelectedCourseId(courseId ?? "");
   }, [courseId]);
 
-  useEffect(() => {
-    if (!open) return;
+  u
+useEffect(() => {
+  if (!open) return;
 
-    const storedUser = localStorage.getItem("studysync_user");
-    if (!storedUser) return;
+  const controller = new AbortController();
 
-    let userId: number;
-
+  async function fetchSavedCourses() {
     try {
-      const user = JSON.parse(storedUser);
-      userId = Number(user.user_id);
-    } catch {
-      return;
-    }
-
-    if (!Number.isInteger(userId) || userId < 1) return;
-
-    async function fetchSavedCourses() {
-      try {
-        const response = await fetch(
-          `/api/courses/saved?user_id=${userId}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to load saved courses");
-        }
-
-        const data: SavedCourse[] = await response.json();
-        setSavedCourses(data);
-      } catch (error) {
-        console.error("Unable to load saved courses.", error);
+      const storedUser = localStorage.getItem("studysync_user");
+      if (!storedUser) {
+        throw new Error("User is not logged in.");
       }
-    }
 
-    void fetchSavedCourses();
-  }, [open]);
+      const user = JSON.parse(storedUser);
+      const userId = Number(user?.user_id);
+
+      if (!Number.isInteger(userId) || userId < 1) {
+        throw new Error("Invalid user ID.");
+      }
+
+      const response = await fetch(
+        `/api/courses/saved?user_id=${userId}`,
+        { signal: controller.signal }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load saved courses.");
+      }
+
+      const data: SavedCourse[] = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid saved courses response.");
+      }
+
+      if (!controller.signal.aborted) {
+        setSavedCourses(data);
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      console.error("Unable to load saved courses.", error);
+      setSavedCourses([]);
+    }
+  }
+
+  void fetchSavedCourses();
+
+  return () => controller.abort();
+}, [open]);
+
 
   useEffect(() => {
     const assistantWidth = open
@@ -149,7 +163,6 @@ export default function AssistantWidget() {
 
     setError(null);
     setLoading(true);
-
 
     setMessages((current) => [
       ...current,
@@ -233,20 +246,23 @@ export default function AssistantWidget() {
           <div className="flex items-start justify-between border-b p-4">
             <div>
               <h2 className="font-semibold">StudySync AI</h2>
-              <select
-                aria-label="Select course context"
-                value={selectedCourseId}
-                onChange={(event) => setSelectedCourseId(event.target.value)}
-                disabled={loading}
-                className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-              >
-                <option value="">General</option>
-                {savedCourses.map((course) => (
-                  <option key={course.course_id} value={course.course_id}>
-                    {course.title}
-                  </option>
-                ))}
-              </select>
+                <select
+                  aria-label="Select course context"
+                  value={selectedCourseId}
+                  onChange={(event) => setSelectedCourseId(event.target.value)}
+                  disabled={loading}
+                  className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+                >
+                  <option value="">General</option>
+                  {courseId && !savedCourses.some((course) => course.course_id === courseId) && (
+                    <option value={courseId}>{courseId}</option>
+                  )}
+                  {savedCourses.map((course) => (
+                    <option key={course.course_id} value={course.course_id}>
+                      {course.title}
+                    </option>
+                  ))}
+                </select>
             </div>
 
             <Button
