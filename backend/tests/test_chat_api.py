@@ -13,6 +13,7 @@ from src.db.base import Base
 from src.db.models import ChatThreadRecord
 from src.db.session import get_db
 from src.ports.llm import LLMUnavailableError
+from src.schemas.retrieval import ExternalCitation
 
 
 class FakeAssistantService:
@@ -25,9 +26,21 @@ class FakeAssistantService:
             raise LLMUnavailableError("Test connection failure")
 
         self.calls.append((question, course_id))
+
+        citations = []
+        if course_id:
+            citations = [
+                ExternalCitation(
+                    provider="searxng",
+                    title="Test Source",
+                    url="https://example.com/source",
+                )
+            ]
+
         return AssistantResult(
             answer=f"Generated answer: {question}",
             mode="course" if course_id else "general",
+            citations=citations,
         )
 
 
@@ -55,7 +68,7 @@ class TestChatAPI(unittest.TestCase):
 
         def override_assistant_service():
             return self.fake_assistant_service
-        
+
         app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[get_assistant_service] = override_assistant_service
         self.client = TestClient(app)
@@ -75,19 +88,28 @@ class TestChatAPI(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        
+
         self.assertEqual(
             self.fake_assistant_service.calls,
             [("What is a process?", "CS537")],
         )
-        
+
         data = response.json()
+
         self.assertEqual(
             data["answer"],
             "Generated answer: What is a process?",
         )
-        
         self.assertEqual(data["mode"], "course")
+
+        self.assertEqual(len(data["citations"]), 1)
+        self.assertEqual(data["citations"][0]["source_type"], "external")
+        self.assertEqual(data["citations"][0]["provider"], "searxng")
+        self.assertEqual(data["citations"][0]["title"], "Test Source")
+        self.assertEqual(
+            data["citations"][0]["url"],
+            "https://example.com/source",
+        )
 
         chat_id = data["chat_id"]
 
@@ -129,7 +151,7 @@ class TestChatAPI(unittest.TestCase):
             )
 
             self.assertEqual(count, 0)
-    
+
     def test_general_chat_without_course(self):
         response = self.client.post(
             "/api/v1/chat",
@@ -145,13 +167,14 @@ class TestChatAPI(unittest.TestCase):
         )
 
         data = response.json()
+
         self.assertIsNone(data["course_id"])
         self.assertEqual(
             data["answer"],
             "Generated answer: Who developed the theory of relativity?",
         )
-        
         self.assertEqual(data["mode"], "general")
+        self.assertEqual(data["citations"], [])
 
         with self.session_factory() as db:
             thread = db.get(ChatThreadRecord, data["chat_id"])

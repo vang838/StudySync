@@ -1,6 +1,14 @@
+from dataclasses import dataclass
+
 from src.application.evidence_retrieval_service import EvidenceRetrievalService
 from src.ports.llm import LLMPort
-from src.schemas.retrieval import Evidence
+from src.schemas.retrieval import Citation, Evidence, ExternalCitation, InternalCitation
+
+
+@dataclass(frozen=True)
+class RAGResult:
+    answer: str
+    citations: list[Citation]
 
 
 class RAGService:
@@ -10,7 +18,7 @@ class RAGService:
         self._retrieval_service = retrieval_service
         self._llm = llm
 
-    def generate(self, *, question: str, course_id: str, document_ids: list[str] | None = None, top_k: int = 5) -> str:
+    def generate(self, *, question: str, course_id: str, document_ids: list[str] | None = None, top_k: int = 5) -> RAGResult:
         question = question.strip()
 
         if not question:
@@ -19,9 +27,13 @@ class RAGService:
         evidence = self._retrieval_service.retrieve(query=question, course_id=course_id, document_ids=document_ids, top_k=top_k)
 
         if not evidence:
-            return "I couldn't find enough information in the available evidence to answer that question."
+            return RAGResult(
+                answer="I couldn't find enough information in the available evidence to answer that question.",
+                citations=[],
+            )
 
         context = "\n\n".join(self._format_evidence(item) for item in evidence)
+        citations = [self._citation_from_evidence(item) for item in evidence]
 
         prompt = (
             "Answer the question using only the evidence provided below.\n"
@@ -32,7 +44,29 @@ class RAGService:
             f"Question:\n{question}"
         )
 
-        return self._llm.generate(prompt)
+        return RAGResult(answer=self._llm.generate(prompt), citations=citations)
+
+    @staticmethod
+    def _citation_from_evidence(evidence: Evidence) -> Citation:
+        source = evidence.source
+
+        if source.source_type == "internal":
+            metadata = source.metadata
+            return InternalCitation(
+                document_id=metadata.document_id,
+                version_id=metadata.version_id,
+                chunk_id=metadata.chunk_id,
+                owner_ref=metadata.owner_ref,
+                page_start=metadata.page_start,
+                page_end=metadata.page_end,
+                section_title=metadata.section_title,
+            )
+
+        return ExternalCitation(
+            provider=source.provider,
+            title=source.title,
+            url=source.url,
+        )
 
     @staticmethod
     def _format_evidence(evidence: Evidence) -> str:

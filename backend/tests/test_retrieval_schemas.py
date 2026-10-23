@@ -1,7 +1,12 @@
 import unittest
 
-from src.schemas.retrieval import Evidence, ExternalEvidenceSource, InternalEvidenceSource
-
+from src.schemas.retrieval import (
+    Evidence,
+    ExternalCitation,
+    ExternalEvidenceSource,
+    InternalCitation,
+    InternalEvidenceSource,
+)
 
 class TestEvidenceSchemas(unittest.TestCase):
     def test_internal_evidence_preserves_document_provenance(self):
@@ -49,6 +54,38 @@ class TestEvidenceSchemas(unittest.TestCase):
         self.assertEqual(evidence.source.source_type, "external")
         self.assertEqual(evidence.source.provider, "test-search")
         self.assertEqual(evidence.source.url, "https://example.com/reference")
+
+    def test_internal_citation_preserves_document_provenance(self):
+        citation = InternalCitation(
+            document_id="doc-1",
+            version_id="version-1",
+            chunk_id="chunk-1",
+            owner_ref="user-1",
+            page_start=12,
+            page_end=13,
+            section_title="Virtual Memory",
+        )
+
+        self.assertEqual(citation.source_type, "internal")
+        self.assertEqual(citation.document_id, "doc-1")
+        self.assertEqual(citation.version_id, "version-1")
+        self.assertEqual(citation.chunk_id, "chunk-1")
+        self.assertEqual(citation.owner_ref, "user-1")
+        self.assertEqual(citation.page_start, 12)
+        self.assertEqual(citation.page_end, 13)
+        self.assertEqual(citation.section_title, "Virtual Memory")
+
+    def test_external_citation_preserves_source_provenance(self):
+        citation = ExternalCitation(
+            provider="searxng",
+            title="Example Source",
+            url="https://example.com/reference",
+        )
+
+        self.assertEqual(citation.source_type, "external")
+        self.assertEqual(citation.provider, "searxng")
+        self.assertEqual(citation.title, "Example Source")
+        self.assertEqual(citation.url, "https://example.com/reference")
 
 
 if __name__ == "__main__":

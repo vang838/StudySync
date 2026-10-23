@@ -78,7 +78,11 @@ def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db), assis
     db.add(thread)
     db.commit()
     db.refresh(thread)
-    return ChatCreateResponse(**_thread_to_schema(thread).model_dump(), mode=result.mode)
+    return ChatCreateResponse(
+        **_thread_to_schema(thread).model_dump(),
+        mode=result.mode,
+        citations=result.citations,
+    )
 
 @router.get("/{chat_id}", response_model=ChatThread)
 def get_chat(chat_id: str, db: Session = Depends(get_db)) -> ChatThread:

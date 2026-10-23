@@ -26,6 +26,7 @@ class TestRAGService(TestCase):
                         "version_id": "version-1",
                         "chunk_id": "chunk-1",
                         "course_id": "cs101",
+                        "owner_ref": "user-1",
                         "chunk_index": 0,
                         "page_start": 12,
                         "page_end": 12,
@@ -75,7 +76,24 @@ class TestRAGService(TestCase):
         self.assertIn("TCP retransmits lost data.", prompt)
         self.assertIn("Question:\nWhat does TCP provide?", prompt)
 
-        self.assertEqual(result, "TCP provides reliable delivery.")
+        self.assertEqual(result.answer, "TCP provides reliable delivery.")
+        self.assertEqual(len(result.citations), 2)
+
+        internal = result.citations[0]
+        self.assertEqual(internal.source_type, "internal")
+        self.assertEqual(internal.document_id, "doc-1")
+        self.assertEqual(internal.version_id, "version-1")
+        self.assertEqual(internal.chunk_id, "chunk-1")
+        self.assertEqual(internal.owner_ref, "user-1")
+        self.assertEqual(internal.page_start, 12)
+        self.assertEqual(internal.page_end, 12)
+        self.assertEqual(internal.section_title, "Transport Layer")
+
+        external = result.citations[1]
+        self.assertEqual(external.source_type, "external")
+        self.assertEqual(external.provider, "searxng")
+        self.assertEqual(external.title, "TCP Overview")
+        self.assertEqual(external.url, "https://example.com/tcp")
 
     def test_rejects_empty_question(self) -> None:
         with self.assertRaisesRegex(ValueError, "question must not be empty"):
@@ -96,9 +114,10 @@ class TestRAGService(TestCase):
         )
 
         self.assertEqual(
-            result,
+            result.answer,
             "I couldn't find enough information in the available evidence to answer that question.",
         )
+        self.assertEqual(result.citations, [])
         self.llm.generate.assert_not_called()
 
         self.retrieval_service.retrieve.assert_called_once_with(
