@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session, selectinload
 from src.db.models import ChatMessageRecord, ChatThreadRecord
 from src.db.session import get_db
 from src.schemas.contracts import ChatCreateRequest, ChatCreateResponse, ChatMessage, ChatThread
-from src.api.dependencies import get_rag_service
-from src.application.rag_service import RAGService
+from src.api.dependencies import get_assistant_service
+from src.application.assistant_service import AssistantService
 from src.ports.llm import (
     LLMResponseError,
     LLMUnavailableError,
@@ -40,9 +40,10 @@ def _thread_to_schema(thread: ChatThreadRecord) -> ChatThread:
 
 
 @router.post("", response_model=ChatCreateResponse, status_code=status.HTTP_201_CREATED)
-def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db), rag_service: RAGService = Depends(get_rag_service),) -> ChatCreateResponse:
+def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db), assistant_service: AssistantService = Depends(get_assistant_service),) -> ChatCreateResponse:
     try:
-        answer = rag_service.generate(question=payload.question, course_id=payload.course_id)
+        result = assistant_service.generate(question=payload.question, course_id=payload.course_id)
+        answer = result.answer
 
     except LLMUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="AI inference service is unavailable.",) from exc
@@ -77,7 +78,7 @@ def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db), rag_s
     db.add(thread)
     db.commit()
     db.refresh(thread)
-    return ChatCreateResponse(**_thread_to_schema(thread).model_dump())
+    return ChatCreateResponse(**_thread_to_schema(thread).model_dump(), mode=result.mode)
 
 @router.get("/{chat_id}", response_model=ChatThread)
 def get_chat(chat_id: str, db: Session = Depends(get_db)) -> ChatThread:

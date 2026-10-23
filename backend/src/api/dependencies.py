@@ -37,6 +37,9 @@ from src.application.document_vector_indexing_service import DocumentVectorIndex
 from src.ports.embedding import EmbeddingPort
 from src.ports.vector_store import VectorStorePort
 
+from src.application.assistant_service import AssistantService
+from src.ports.llm import LLMPort
+
 import boto3
 
 def get_embedding_port() -> Generator[EmbeddingPort, None, None]:
@@ -131,10 +134,15 @@ def get_document_vector_indexing_service(db: Session = Depends(get_db), embeddin
 def get_document_retrieval_service(db: Session = Depends(get_db), embedding_port: EmbeddingPort = Depends(get_embedding_port), vector_store: VectorStorePort = Depends(get_vector_store),) -> DocumentRetrievalService:
     return DocumentRetrievalService(db=db, embedding_port=embedding_port, vector_store=vector_store)
 
-def get_rag_service(retrieval_service: DocumentRetrievalService = Depends(get_document_retrieval_service)) -> Generator[RAGService, None, None]:
+def get_llm_port() -> Generator[LLMPort, None, None]:
     if settings.ai_provider != "ollama":
         raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
 
     with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
-        llm = OllamaAdapter(client=client, model=settings.ai_model)
-        yield RAGService(retrieval_service=retrieval_service, llm=llm)
+        yield OllamaAdapter(client=client, model=settings.ai_model)
+        
+def get_rag_service(retrieval_service: DocumentRetrievalService = Depends(get_document_retrieval_service), llm: LLMPort = Depends(get_llm_port)) -> RAGService:
+    return RAGService(retrieval_service=retrieval_service, llm=llm)
+
+def get_assistant_service(llm: LLMPort = Depends(get_llm_port), rag_service: RAGService = Depends(get_rag_service)) -> AssistantService:
+    return AssistantService(llm=llm, rag_service=rag_service)
