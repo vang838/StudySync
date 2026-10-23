@@ -80,6 +80,12 @@ export default function Header() {
                     </NavigationMenuItem>
 
                     <NavigationMenuItem>
+                        <NavigationMenuLink href="/dashboard/study-center" className="py-2 text-sm text-foreground">
+                            Study Center
+                        </NavigationMenuLink>
+                    </NavigationMenuItem>
+
+                    <NavigationMenuItem>
                         <NavigationMenuLink href="/courses/course_search" className="py-2 text-sm text-foreground">
                             Course Search
                         </NavigationMenuLink>
