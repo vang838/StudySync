@@ -70,12 +70,14 @@ export default function Sidebars({children}: { children: React.ReactNode; }) {
                                                   <div className="ml-3 border-l pl-3">
                                                     <SidebarMenu>
                                                       <SidebarMenuItem>
-                                                        <Link href="/dashboard" className="block w-full">
+                                                        <Link href="/dashboard/study-center" className="block w-full">
                                                           <SidebarMenuButton>Practice Exam</SidebarMenuButton>
                                                         </Link>  
                                                       </SidebarMenuItem>
                                                       <SidebarMenuItem>
+                                                        <Link href="/dashboard/study-center" className="block w-full">
                                                           <SidebarMenuButton>Study Guide</SidebarMenuButton>
+                                                        </Link>  
                                                       </SidebarMenuItem>
                                                       <SidebarMenuItem>
                                                         <Link href="/dashboard/flashcards" className="block w-full">
