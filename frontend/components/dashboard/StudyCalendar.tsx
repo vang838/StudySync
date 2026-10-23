@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useRef, useState} from "react";
+import {useRef, useState} from "react";
 import {
     Card,
     CardContent,
@@ -29,21 +29,9 @@ function dateKey(date: Date) {
 }
 
 export default function StudyCalendar() {
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [selectedDate, setSelectedDate] = useState(() => new Date());
     const dialogRef = useRef<HTMLDialogElement>(null);
     const {tasks} = useStudyTasks();
-
-    useEffect(() => {
-        setSelectedDate(new Date());
-    }, []);
-
-    if (!selectedDate) {
-        return (
-            <Card>
-                <CardContent>Loading calendar…</CardContent>
-            </Card>
-        );
-    }
 
     const monday = startOfWeek(selectedDate);
     const weekDays = Array.from({length: 7}, (_, index) => {
@@ -68,7 +56,7 @@ export default function StudyCalendar() {
 
     function moveWeek(amount: number) {
         setSelectedDate((currentDate) => {
-            const nextDate = new Date(currentDate ?? new Date());
+            const nextDate = new Date(currentDate);
             nextDate.setDate(nextDate.getDate() + amount * 7);
             return nextDate;
         });
@@ -76,7 +64,7 @@ export default function StudyCalendar() {
 
     function moveMonth(amount: number) {
         setSelectedDate((currentDate) => {
-            const date = currentDate ?? new Date();
+            const date = currentDate;
             const year = date.getFullYear();
             const month = date.getMonth() + amount;
             const lastDay = new Date(year, month + 1, 0).getDate();

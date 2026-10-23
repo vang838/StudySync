@@ -25,7 +25,6 @@ type UserProfile = {
 
 export default function Header() {
 
-    const [greeting, setGreeting] = useState("Guest");
     const [isHovered, setIsHovered] = useState(false);
     const [userId, setUserId] = useState<number | null>(null);
     useEffect(() => {
@@ -43,9 +42,10 @@ export default function Header() {
             })
             .then((user: UserProfile) => {
                 setUserId(user.user_id);
-                setGreeting(user.first_name);
             })
-            .catch(() => setGreeting("there"));
+            .catch(() => {
+                setUserId(null);
+            });
 
     }, []);
 
