@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -13,26 +12,63 @@ import {
 type StudyMode = "exam" | "guide";
 type Difficulty = "Easy" | "Medium" | "Hard";
 
-const courses = [
-  { id: "BIO 201", name: "Human Biology" },
-  { id: "MATH 240", name: "Statistics & Probability" },
-  { id: "HIST 108", name: "World History" },
-];
+type SavedCourse = {
+  course_id: string;
+  title: string;
+};
 
 export default function StudyCenterPage() {
   const [mode, setMode] = useState<StudyMode>("exam");
-  const [course, setCourse] = useState("BIO 201");
+  const [courses, setCourses] = useState<SavedCourse[]>([]);
+  const [course, setCourse] = useState("");
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [coursesError, setCoursesError] = useState("");
   const [topic, setTopic] = useState("");
-  const [difficulty, setDifficulty] =
-    useState<Difficulty>("Medium");
+  const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
   const [questionCount, setQuestionCount] = useState(15);
   const [guideLength, setGuideLength] = useState("Detailed");
 
   const selectedCourse = courses.find(
-    (item) => item.id === course
+    (item) => item.course_id === course
   );
 
   const isExam = mode === "exam";
+
+  useEffect(() => {
+    async function loadSavedCourses() {
+      try {
+        const userId = Number(localStorage.getItem("user_id"));
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+          throw new Error("Invalid user ID.");
+        }
+
+        const response = await fetch(
+          `/api/courses/saved?user_id=${userId}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load saved courses.");
+        }
+
+        const data = (await response.json()) as SavedCourse[];
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid course data.");
+        }
+
+        setCourses(data);
+        setCourse(data[0]?.course_id ?? "");
+      } catch (err) {
+        console.error(err);
+        setCoursesError("Unable to load your saved courses.");
+      } finally {
+        setCoursesLoading(false);
+      }
+    }
+
+    loadSavedCourses();
+  }, []);
 
   return (
     <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-8 text-foreground md:px-10">
@@ -105,11 +141,10 @@ export default function StudyCenterPage() {
                   className="group rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
                 >
                   <div
-                    className={`flex h-full flex-col justify-between rounded-2xl border p-6 transition-all duration-200 ${
-                      selected
+                    className={`flex h-full flex-col justify-between rounded-2xl border p-6 transition-all duration-200 ${selected
                         ? "border-secondary bg-secondary/5 shadow-md"
                         : "border-foreground/10 bg-card hover:border-secondary/50 hover:shadow-sm"
-                    }`}
+                      }`}
                   >
                     <div>
                       <div className="mb-5 flex items-center justify-between">
@@ -118,11 +153,10 @@ export default function StudyCenterPage() {
                         </span>
 
                         <span
-                          className={`flex h-6 w-6 items-center justify-center rounded-full border text-sm ${
-                            selected
+                          className={`flex h-6 w-6 items-center justify-center rounded-full border text-sm ${selected
                               ? "border-secondary bg-secondary text-secondary-foreground"
                               : "border-foreground/20"
-                          }`}
+                            }`}
                         >
                           {selected ? "✓" : ""}
                         </span>
@@ -188,13 +222,20 @@ export default function StudyCenterPage() {
                     id="study-course"
                     value={course}
                     onChange={(e) => setCourse(e.target.value)}
+                    disabled={coursesLoading || courses.length === 0}
                     className="w-full appearance-none rounded-xl border border-foreground/10 bg-muted/40 px-4 py-4 pr-10 text-sm font-medium text-foreground shadow-sm transition hover:border-secondary/40 hover:bg-muted/60 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
                   >
-                    {courses.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.id} — {item.name}
-                      </option>
-                    ))}
+                    {coursesLoading ? (
+                      <option value="">Loading saved courses...</option>
+                    ) : courses.length === 0 ? (
+                      <option value="">No saved courses</option>
+                    ) : (
+                      courses.map((item) => (
+                        <option key={item.course_id} value={item.course_id}>
+                          {item.course_id} — {item.title}
+                        </option>
+                      ))
+                    )}
                   </select>
 
                   {/* Custom dropdown arrow */}
@@ -214,6 +255,12 @@ export default function StudyCenterPage() {
                     </svg>
                   </span>
                 </div>
+
+                {coursesError && (
+                  <p className="text-xs text-red-500">
+                    {coursesError}
+                  </p>
+                )}
               </div>
 
               {/* Topic input */}
@@ -252,11 +299,10 @@ export default function StudyCenterPage() {
                         key={level}
                         onClick={() => setDifficulty(level)}
                         aria-pressed={difficulty === level}
-                        className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                          difficulty === level
+                        className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${difficulty === level
                             ? "border-secondary bg-secondary/10 text-foreground"
                             : "border-foreground/10 bg-muted/30 text-muted-foreground hover:border-secondary/40 hover:bg-muted/60"
-                        }`}
+                          }`}
                       >
                         {level}
                       </button>
@@ -279,11 +325,10 @@ export default function StudyCenterPage() {
                         type="button"
                         onClick={() => setQuestionCount(count)}
                         aria-pressed={questionCount === count}
-                        className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                          questionCount === count
+                        className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${questionCount === count
                             ? "border-secondary bg-secondary/10 text-foreground"
                             : "border-foreground/10 bg-muted/30 text-muted-foreground hover:border-secondary/40 hover:bg-muted/60"
-                        }`}
+                          }`}
                       >
                         {count}
                       </button>
@@ -304,11 +349,10 @@ export default function StudyCenterPage() {
                           type="button"
                           onClick={() => setGuideLength(length)}
                           aria-pressed={guideLength === length}
-                          className={`rounded-xl border px-2 py-3 text-sm font-medium transition ${
-                            guideLength === length
+                          className={`rounded-xl border px-2 py-3 text-sm font-medium transition ${guideLength === length
                               ? "border-secondary bg-secondary/10 text-foreground"
                               : "border-foreground/10 bg-muted/30 text-muted-foreground hover:border-secondary/40 hover:bg-muted/60"
-                          }`}
+                            }`}
                         >
                           {length}
                         </button>
@@ -339,7 +383,7 @@ export default function StudyCenterPage() {
                 </span>
 
                 <h3 className="font-heading mt-3 text-xl font-bold">
-                  {selectedCourse?.name}
+                  {selectedCourse?.title ?? "No course selected"}
                 </h3>
 
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -352,7 +396,7 @@ export default function StudyCenterPage() {
                   <span className="text-muted-foreground">
                     Course
                   </span>
-                  <span className="font-medium">{course}</span>
+                  <span className="font-medium">{course || "—"}</span>
                 </div>
 
                 <div className="h-px bg-foreground/10" />
