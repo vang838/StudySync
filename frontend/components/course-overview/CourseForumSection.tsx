@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,8 @@ const ThumbsUpIcon = ({ filled = false }: { filled?: boolean }) => (
 );
 
 export default function CourseForumSection({ courseId, focusPostId }: CourseForumSectionProps) {
+  const router = useRouter();
+  
   const [forumPosts, setForumPosts] = useState<ForumPost[]>([]);
   const [focusedPost, setFocusedPost] = useState<ForumPost | null>(null);
   const [forumLoading, setForumLoading] = useState(true);
@@ -241,6 +244,11 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
         const body = await response.json().catch(() => ({}));
         throw new Error(body?.detail ?? `Unable to delete post (HTTP ${response.status})`);
       }
+      if (focusMode && postId === focusPostId) {
+        router.replace(`/courses/${encodeURIComponent(courseId)}`);
+        return;
+      }
+
       await loadForumData();
     } catch (deleteError) {
       const message = deleteError instanceof Error ? deleteError.message : "Unable to delete forum post.";
@@ -660,11 +668,10 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
                   type="button"
                   onClick={() => setPage(item)}
                   disabled={isActive}
-                  className={`text-sm ${
-                    isActive
+                  className={`text-sm ${isActive
                       ? "font-semibold text-foreground"
                       : "text-primary underline-offset-2 hover:underline"
-                  } disabled:cursor-default`}
+                    } disabled:cursor-default`}
                 >
                   {item}
                 </button>

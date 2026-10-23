@@ -24,17 +24,10 @@ export default function UploadDocumentsPage() {
   useEffect(() => {
     async function loadCourses() {
       try {
-        const rawUser = localStorage.getItem("studysync_user");
-
-        if (!rawUser) {
-          throw new Error("Please sign in first.");
-        }
-
-        const user = JSON.parse(rawUser);
-        const userId = Number(user.user_id);
+        const userId = Number(localStorage.getItem("user_id"));
 
         if (!Number.isInteger(userId) || userId <= 0) {
-          throw new Error("Invalid user ID.");
+          throw new Error("Please sign in first.");
         }
 
         const response = await fetch(

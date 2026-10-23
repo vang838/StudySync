@@ -54,54 +54,48 @@ export default function AssistantWidget() {
     setSelectedCourseId(courseId ?? "");
   }, [courseId]);
 
-useEffect(() => {
-  if (!open) return;
+  useEffect(() => {
+    if (!open) return;
 
-  const controller = new AbortController();
+    const controller = new AbortController();
 
-  async function fetchSavedCourses() {
-    try {
-      const storedUser = localStorage.getItem("studysync_user");
-      if (!storedUser) {
-        throw new Error("User is not logged in.");
+    async function fetchSavedCourses() {
+      try {
+        const userId = Number(localStorage.getItem("user_id"));
+
+        if (!Number.isInteger(userId) || userId < 1) {
+          throw new Error("Invalid user ID.");
+        }
+
+        const response = await fetch(
+          `/api/courses/saved?user_id=${userId}`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load saved courses.");
+        }
+
+        const data: SavedCourse[] = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid saved courses response.");
+        }
+
+        if (!controller.signal.aborted) {
+          setSavedCourses(data);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Unable to load saved courses.", error);
+        setSavedCourses([]);
       }
-
-      const user = JSON.parse(storedUser);
-      const userId = Number(user?.user_id);
-
-      if (!Number.isInteger(userId) || userId < 1) {
-        throw new Error("Invalid user ID.");
-      }
-
-      const response = await fetch(
-        `/api/courses/saved?user_id=${userId}`,
-        { signal: controller.signal }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to load saved courses.");
-      }
-
-      const data: SavedCourse[] = await response.json();
-
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid saved courses response.");
-      }
-
-      if (!controller.signal.aborted) {
-        setSavedCourses(data);
-      }
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      console.error("Unable to load saved courses.", error);
-      setSavedCourses([]);
     }
-  }
 
-  void fetchSavedCourses();
+    void fetchSavedCourses();
 
-  return () => controller.abort();
-}, [open]);
+    return () => controller.abort();
+  }, [open]);
 
 
   useEffect(() => {
@@ -223,9 +217,8 @@ useEffect(() => {
 
       {open && (
         <aside
-          className={`fixed right-0 top-0 z-50 flex h-screen flex-col border-l bg-background shadow-xl ${
-            resizing ? "select-none" : ""
-          }`}
+          className={`fixed right-0 top-0 z-50 flex h-screen flex-col border-l bg-background shadow-xl ${resizing ? "select-none" : ""
+            }`}
           style={{
             width: `${width}px`,
             maxWidth: "66.6667vw",
@@ -245,23 +238,23 @@ useEffect(() => {
           <div className="flex items-start justify-between border-b p-4">
             <div>
               <h2 className="font-semibold">StudySync AI</h2>
-                <select
-                  aria-label="Select course context"
-                  value={selectedCourseId}
-                  onChange={(event) => setSelectedCourseId(event.target.value)}
-                  disabled={loading}
-                  className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-                >
-                  <option value="">General</option>
-                  {courseId && !savedCourses.some((course) => course.course_id === courseId) && (
-                    <option value={courseId}>{courseId}</option>
-                  )}
-                  {savedCourses.map((course) => (
-                    <option key={course.course_id} value={course.course_id}>
-                      {course.title}
-                    </option>
-                  ))}
-                </select>
+              <select
+                aria-label="Select course context"
+                value={selectedCourseId}
+                onChange={(event) => setSelectedCourseId(event.target.value)}
+                disabled={loading}
+                className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+              >
+                <option value="">General</option>
+                {courseId && !savedCourses.some((course) => course.course_id === courseId) && (
+                  <option value={courseId}>{courseId}</option>
+                )}
+                {savedCourses.map((course) => (
+                  <option key={course.course_id} value={course.course_id}>
+                    {course.title}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <Button
@@ -283,11 +276,10 @@ useEffect(() => {
               messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                    message.role === "user"
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${message.role === "user"
                       ? "ml-auto bg-primary text-primary-foreground"
                       : "mr-auto bg-muted"
-                  }`}
+                    }`}
                 >
                   {message.content}
                 </div>
