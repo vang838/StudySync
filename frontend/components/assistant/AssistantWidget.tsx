@@ -54,7 +54,6 @@ export default function AssistantWidget() {
     setSelectedCourseId(courseId ?? "");
   }, [courseId]);
 
-  u
 useEffect(() => {
   if (!open) return;
 
