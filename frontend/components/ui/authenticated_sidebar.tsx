@@ -1,11 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import {useState} from "react";
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarGroup,
-    SidebarGroupContent,
     SidebarGroupLabel,
+    SidebarGroupContent,
     SidebarHeader,
     SidebarInset,
     SidebarMenu,
@@ -17,6 +20,13 @@ import {
 import {Button} from "@/components/ui/button";
 
 export default function Sidebars({children}: { children: React.ReactNode; }) {
+    const [isClicked, setIsClicked] = useState(false);
+
+    const handleClick = () => {
+    setIsClicked((prev) => !prev);
+   };
+
+
     return (
         <>
             <SidebarProvider className="flex min-h-0 flex-1 overflow-hidden">
@@ -27,49 +37,73 @@ export default function Sidebars({children}: { children: React.ReactNode; }) {
                         </SidebarHeader>
                         <SidebarContent>
                             <SidebarGroup>
-                                <SidebarGroupLabel>Workspace</SidebarGroupLabel>
                                 <SidebarGroupContent>
                                     <SidebarMenu>
                                         <SidebarMenuItem>
-                                            <SidebarMenuButton isActive>Overview</SidebarMenuButton>
+                                          <Link href="/dashboard" className="block w-full">
+                                            <SidebarMenuButton>Home</SidebarMenuButton>
+                                          </Link>  
                                         </SidebarMenuItem>
-                                        <SidebarMenuItem>
-                                            <Link
-                                                href="/dashboard/study-center"
-                                                className="block w-full"
-                                            >
-                                                <SidebarMenuButton className="w-full">
-                                                    Study sessions
-                                                </SidebarMenuButton>
-                                            </Link>
-                                        </SidebarMenuItem>
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton>Assignments</SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    </SidebarMenu>
-                                </SidebarGroupContent>
-                            </SidebarGroup>
-                            <SidebarGroup>
-                                <SidebarGroupLabel>Resources</SidebarGroupLabel>
-                                <SidebarGroupContent>
-                                    <SidebarMenu>
                                         <SidebarMenuItem>
                                             <SidebarMenuButton>Library</SidebarMenuButton>
                                         </SidebarMenuItem>
                                         <SidebarMenuItem>
-                                            <SidebarMenuButton>Settings</SidebarMenuButton>
+                                          <Link href="/collaborative-hub" className="block w-full">
+                                            <SidebarMenuButton>Collaborative Hub</SidebarMenuButton>
+                                          </Link>  
+                                        </SidebarMenuItem>
+                                        <SidebarMenuItem>
+                                          <Link href="/dashboard/study-center" className="block w-full">
+                                              <SidebarMenuButton className="w-full">
+                                                  Study sessions
+                                              </SidebarMenuButton>
+                                          </Link>
+                                        </SidebarMenuItem>
+                                        <SidebarMenuItem>
+                                          <div onClick={handleClick}>
+                                              <SidebarMenuButton className="w-full">
+                                                  Study Tools
+                                              </SidebarMenuButton>
+                                              {isClicked && (
+                                                <>
+                                                  <SidebarGroupLabel>Create</SidebarGroupLabel>
+                                                  <div className="ml-3 border-l pl-3">
+                                                    <SidebarMenu>
+                                                      <SidebarMenuItem>
+                                                        <Link href="/dashboard" className="block w-full">
+                                                          <SidebarMenuButton>Practice Exam</SidebarMenuButton>
+                                                        </Link>  
+                                                      </SidebarMenuItem>
+                                                      <SidebarMenuItem>
+                                                          <SidebarMenuButton>Study Guide</SidebarMenuButton>
+                                                      </SidebarMenuItem>
+                                                      <SidebarMenuItem>
+                                                        <Link href="/dashboard/flashcards" className="block w-full">
+                                                          <SidebarMenuButton>Flashcards</SidebarMenuButton>
+                                                        </Link>  
+                                                      </SidebarMenuItem>
+                                                    </SidebarMenu>
+                                                  </div>
+                                                  <SidebarGroupLabel>Resources</SidebarGroupLabel>
+                                                  <div className="ml-3 border-l pl-3">
+                                                    <SidebarMenu>
+                                                      <SidebarMenuItem>
+                                                          <SidebarMenuButton>My Planner</SidebarMenuButton>
+                                                      </SidebarMenuItem>
+                                                      <SidebarMenuItem>
+                                                          <SidebarMenuButton>Timer</SidebarMenuButton>
+                                                      </SidebarMenuItem>
+                                                    </SidebarMenu>  
+                                                </div> 
+                                              </>     
+                                              )}
+                                              
+                                          </div>
                                         </SidebarMenuItem>
                                     </SidebarMenu>
                                 </SidebarGroupContent>
                             </SidebarGroup>
                         </SidebarContent>
-                        <SidebarFooter className="p-4">
-                            <SidebarMenu>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton>Account</SidebarMenuButton>
-                                </SidebarMenuItem>
-                            </SidebarMenu>
-                        </SidebarFooter>
                     </Sidebar>
 
                     <SidebarInset className="min-h-0 flex-1 overflow-hidden">

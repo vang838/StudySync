@@ -60,13 +60,8 @@ export default function Header() {
             className="grid h-16 w-full grid-cols-[1fr_auto_1fr] items-center border-b-4 border-amber-400 bg-white px-8 text-foreground">
 
 
-            <Link
-                href="/"
-                aria-label="Go to StudySync main page"
-                className="justify-self-start"
-            >
-                <Image className="-translate-y-2" src="/StudySync.png" alt="StudySync logo" width={125} height={50}
-                       priority/>
+            <Link href="/dashboard" aria-label="Go to StudySync main page" className="justify-self-start">
+                <Image className="-translate-y-2" src="/StudySync.png" alt="StudySync logo" width={125} height={50} priority/>
             </Link>
 
             {/*Options that's in the middle */}
