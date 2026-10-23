@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.main import app
 from src.db.base import Base
-from src.db.models import Course, User
+from src.db.models import Course, User, UserCourseSave
 from src.db.session import get_db
 
 
@@ -74,6 +74,7 @@ class TestCourseSaveAPI(unittest.TestCase):
         response = self.client.post("/api/v1/courses/CS101/save?user_id=1")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["saved"])
+        self.assertFalse(response.json().get("archived", False))
 
         duplicate_response = self.client.post("/api/v1/courses/CS101/save?user_id=1")
         self.assertEqual(duplicate_response.status_code, 200)
@@ -86,6 +87,7 @@ class TestCourseSaveAPI(unittest.TestCase):
         self.assertEqual(saved_response.status_code, 200)
         self.assertEqual(len(saved_response.json()), 1)
         self.assertEqual(saved_response.json()[0]["course_id"], "CS101")
+        self.assertFalse(saved_response.json()[0]["is_archived"])
 
         saved_only_search_response = self.client.get("/api/v1/courses/search?savedOnly=true&user_id=1")
         self.assertEqual(saved_only_search_response.status_code, 200)
@@ -108,6 +110,87 @@ class TestCourseSaveAPI(unittest.TestCase):
         unsave_response = self.client.delete("/api/v1/courses/CS101/save?user_id=1")
         self.assertEqual(unsave_response.status_code, 200)
         self.assertFalse(unsave_response.json()["saved"])
+
+    def test_archive_saved_course_is_user_specific_and_reversible(self):
+        with self.session_factory() as db:
+            db.add(
+                User(
+                    user_first_name="Ada",
+                    user_last_name="Lovelace",
+                    user_email="ada@example.com",
+                    password_hash="hashed-password",
+                )
+            )
+            db.add(
+                User(
+                    user_first_name="Grace",
+                    user_last_name="Hopper",
+                    user_email="grace@example.com",
+                    password_hash="hashed-password",
+                )
+            )
+            db.add(
+                Course(
+                    course_id="CS101",
+                    title="Intro to Computer Science",
+                    description="Foundations of programming.",
+                    subject="Computer Science",
+                    year=2025,
+                    professor="Dr. Reed",
+                )
+            )
+            db.commit()
+
+        self.client.post("/api/v1/courses/CS101/save?user_id=1")
+        self.client.post("/api/v1/courses/CS101/save?user_id=2")
+
+        archive_response = self.client.post("/api/v1/courses/CS101/archive?user_id=1")
+        self.assertEqual(archive_response.status_code, 200)
+        self.assertTrue(archive_response.json()["archived"])
+
+        user_one_active_saved = self.client.get("/api/v1/courses/saved?user_id=1")
+        self.assertEqual(user_one_active_saved.status_code, 200)
+        self.assertEqual(user_one_active_saved.json(), [])
+
+        user_one_all_saved = self.client.get("/api/v1/courses/saved?user_id=1&include_archived=true")
+        self.assertEqual(user_one_all_saved.status_code, 200)
+        self.assertEqual(len(user_one_all_saved.json()), 1)
+        self.assertTrue(user_one_all_saved.json()[0]["is_archived"])
+
+        user_two_active_saved = self.client.get("/api/v1/courses/saved?user_id=2")
+        self.assertEqual(user_two_active_saved.status_code, 200)
+        self.assertEqual(len(user_two_active_saved.json()), 1)
+        self.assertFalse(user_two_active_saved.json()[0]["is_archived"])
+
+        saved_only_user_one = self.client.get("/api/v1/courses/search?savedOnly=true&user_id=1")
+        self.assertEqual(saved_only_user_one.status_code, 200)
+        self.assertEqual(saved_only_user_one.json()["total_count"], 0)
+
+        saved_only_user_two = self.client.get("/api/v1/courses/search?savedOnly=true&user_id=2")
+        self.assertEqual(saved_only_user_two.status_code, 200)
+        self.assertEqual(saved_only_user_two.json()["total_count"], 1)
+
+        self.assertEqual(self.client.get("/api/v1/courses/CS101/saved?user_id=1").json()["saved"], False)
+        self.assertEqual(self.client.get("/api/v1/courses/CS101/saved?user_id=2").json()["saved"], True)
+
+        restore_response = self.client.delete("/api/v1/courses/CS101/archive?user_id=1")
+        self.assertEqual(restore_response.status_code, 200)
+        self.assertFalse(restore_response.json()["archived"])
+
+        user_one_restored = self.client.get("/api/v1/courses/saved?user_id=1")
+        self.assertEqual(user_one_restored.status_code, 200)
+        self.assertEqual(len(user_one_restored.json()), 1)
+        self.assertFalse(user_one_restored.json()[0]["is_archived"])
+
+        with self.session_factory() as db:
+            membership = db.scalar(
+                select(UserCourseSave).where(
+                    UserCourseSave.user_id == 1,
+                    UserCourseSave.course_id == "CS101",
+                )
+            )
+            self.assertIsNotNone(membership)
+            self.assertFalse(membership.is_archived)
 
     def test_subjects_endpoint_is_distinct_and_sorted(self):
         with self.session_factory() as db:

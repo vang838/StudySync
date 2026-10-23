@@ -45,6 +45,12 @@ def _serialize_course(course: Course) -> dict:
     }
 
 
+def _serialize_saved_course(course: Course, membership: UserCourseSave) -> dict:
+    payload = _serialize_course(course)
+    payload["is_archived"] = membership.is_archived
+    return payload
+
+
 def _serialize_user(user: User) -> dict:
     return {
         "user_id": user.user_id,
@@ -86,6 +92,7 @@ def _assert_user_is_course_member(db: Session, course_id: str, user_id: int) -> 
         select(UserCourseSave.id).where(
             UserCourseSave.course_id == course_id,
             UserCourseSave.user_id == user_id,
+            UserCourseSave.is_archived.is_(False),
         )
     )
     if membership is None:
@@ -283,7 +290,8 @@ def _search_courses(
             )
         _get_user_or_404(db, user_id)
         query = query.join(UserCourseSave, UserCourseSave.course_id == Course.course_id).filter(
-            UserCourseSave.user_id == user_id
+            UserCourseSave.user_id == user_id,
+            UserCourseSave.is_archived.is_(False),
         )
 
     total_count = query.count()
@@ -735,16 +743,23 @@ def unlike_forum_post(
 @router.get("/saved")
 def list_saved_courses(
     user_id: int = Query(..., ge=1, description="User whose saved courses to fetch."),
+    include_archived: bool = Query(
+        False,
+        description="When true, include archived courses saved by the user.",
+    ),
     db: Session = Depends(get_db),
 ) -> List[dict]:
     user = _get_user_or_404(db, user_id)
-    saved_courses = db.scalars(
-        select(Course)
+    query = (
+        select(Course, UserCourseSave)
         .join(UserCourseSave, UserCourseSave.course_id == Course.course_id)
         .where(UserCourseSave.user_id == user.user_id)
         .order_by(Course.title.asc())
-    ).all()
-    return [_serialize_course(course) for course in saved_courses]
+    )
+    if not include_archived:
+        query = query.where(UserCourseSave.is_archived.is_(False))
+    saved_course_rows = db.execute(query).all()
+    return [_serialize_saved_course(course, membership) for course, membership in saved_course_rows]
 
 
 @router.get("/{course_id}/members")
@@ -756,7 +771,7 @@ def list_course_members(
     members = db.scalars(
         select(User)
         .join(UserCourseSave, UserCourseSave.user_id == User.user_id)
-        .where(UserCourseSave.course_id == course_id)
+        .where(UserCourseSave.course_id == course_id, UserCourseSave.is_archived.is_(False))
         .order_by(User.user_first_name.asc(), User.user_last_name.asc())
     ).all()
     return [_serialize_user(member) for member in members]
@@ -779,6 +794,7 @@ def is_course_saved(
         select(UserCourseSave.id).where(
             UserCourseSave.user_id == user_id,
             UserCourseSave.course_id == course_id,
+            UserCourseSave.is_archived.is_(False),
         )
     )
     return {"course_id": course_id, "user_id": user_id, "saved": saved is not None}
@@ -802,12 +818,22 @@ def save_course_for_user(
     user = _get_user_or_404(db, resolved_user_id)
 
     existing = db.scalar(
-        select(UserCourseSave.id).where(
+        select(UserCourseSave).where(
             UserCourseSave.user_id == user.user_id,
             UserCourseSave.course_id == course.course_id,
         )
     )
     if existing is not None:
+        if existing.is_archived:
+            existing.is_archived = False
+            db.add(existing)
+            db.commit()
+            return {
+                "message": "Course restored from archive.",
+                "course_id": course.course_id,
+                "user_id": user.user_id,
+                "saved": True,
+            }
         return {
             "message": "Course is already saved for this user.",
             "course_id": course.course_id,
@@ -864,6 +890,102 @@ def unsave_course_for_user(
         "course_id": course_id,
         "user_id": resolved_user_id,
         "saved": False,
+    }
+
+
+@router.post("/{course_id}/archive")
+def archive_saved_course_for_user(
+    course_id: str,
+    payload: SaveCourseRequest | None = None,
+    db: Session = Depends(get_db),
+    user_id: int | None = Query(default=None, ge=1, description="User ID whose saved course should be archived."),
+) -> dict:
+    resolved_user_id = (payload.user_id if payload else user_id)
+    if resolved_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A user_id is required to archive a course.",
+        )
+
+    _get_course_or_404(db, course_id)
+    _get_user_or_404(db, resolved_user_id)
+
+    link = db.scalar(
+        select(UserCourseSave).where(
+            UserCourseSave.user_id == resolved_user_id,
+            UserCourseSave.course_id == course_id,
+        )
+    )
+    if link is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course is not saved for this user.",
+        )
+
+    if link.is_archived:
+        return {
+            "message": "Course is already archived for this user.",
+            "course_id": course_id,
+            "user_id": resolved_user_id,
+            "archived": True,
+        }
+
+    link.is_archived = True
+    db.add(link)
+    db.commit()
+    return {
+        "message": "Course archived successfully.",
+        "course_id": course_id,
+        "user_id": resolved_user_id,
+        "archived": True,
+    }
+
+
+@router.delete("/{course_id}/archive")
+def unarchive_saved_course_for_user(
+    course_id: str,
+    payload: SaveCourseRequest | None = None,
+    db: Session = Depends(get_db),
+    user_id: int | None = Query(default=None, ge=1, description="User ID whose archived course should be restored."),
+) -> dict:
+    resolved_user_id = (payload.user_id if payload else user_id)
+    if resolved_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A user_id is required to unarchive a course.",
+        )
+
+    _get_course_or_404(db, course_id)
+    _get_user_or_404(db, resolved_user_id)
+
+    link = db.scalar(
+        select(UserCourseSave).where(
+            UserCourseSave.user_id == resolved_user_id,
+            UserCourseSave.course_id == course_id,
+        )
+    )
+    if link is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course is not saved for this user.",
+        )
+
+    if not link.is_archived:
+        return {
+            "message": "Course is already active for this user.",
+            "course_id": course_id,
+            "user_id": resolved_user_id,
+            "archived": False,
+        }
+
+    link.is_archived = False
+    db.add(link)
+    db.commit()
+    return {
+        "message": "Course restored from archive.",
+        "course_id": course_id,
+        "user_id": resolved_user_id,
+        "archived": False,
     }
 
 

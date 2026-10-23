@@ -27,6 +27,7 @@ type SavedCourse = {
   professor?: string | null;
   subject: string;
   year: number;
+  is_archived?: boolean;
 };
 
 type BookmarkedForumPost = {
@@ -144,6 +145,40 @@ export default function UserProfilePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
+  const [activeUserId, setActiveUserId] = useState<number | null>(null);
+  const [archivingCourseIds, setArchivingCourseIds] = useState<string[]>([]);
+  const [showArchivedCourses, setShowArchivedCourses] = useState(false);
+
+  const setCourseArchivedState = async (courseId: string, shouldArchive: boolean) => {
+    if (!activeUserId || archivingCourseIds.includes(courseId)) {
+      return;
+    }
+
+    setArchivingCourseIds((current) => [...current, courseId]);
+    try {
+      const response = await fetch(
+        `/api/courses/${encodeURIComponent(courseId)}/archive?user_id=${activeUserId}`,
+        { method: shouldArchive ? "POST" : "DELETE" },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.detail ?? `Failed to update archive state (HTTP ${response.status})`);
+      }
+      setSavedCourses((current) =>
+        current.map((course) => (
+          course.course_id === courseId
+            ? { ...course, is_archived: shouldArchive }
+            : course
+        )),
+      );
+    } catch (archiveError) {
+      const message = archiveError instanceof Error ? archiveError.message : "Unable to update course archive state.";
+      setError(message);
+    } finally {
+      setArchivingCourseIds((current) => current.filter((id) => id !== courseId));
+    }
+  };
+
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;
@@ -154,7 +189,7 @@ export default function UserProfilePage({
       try {
         const [userResponse, coursesResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
-        fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}`),
+          fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}&include_archived=true`),
         ]);
 
         if (!userResponse.ok) {
@@ -169,11 +204,14 @@ export default function UserProfilePage({
 
         const userData = (await userResponse.json()) as UserProfile;
         const courseData = (await coursesResponse.json()) as SavedCourse[];
-        const normalizedCourseData = Array.isArray(courseData) ? courseData : [];
+        const normalizedCourseData = Array.isArray(courseData)
+          ? courseData.map((course) => ({ ...course, is_archived: Boolean(course.is_archived) }))
+          : [];
         const parsedUserId = Number(userId);
         const resolvedNumericUserId = Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : userData.user_id;
+        const activeCourses = normalizedCourseData.filter((course) => !course.is_archived);
         const forumResponses = await Promise.all(
-          normalizedCourseData.map((course) =>
+          activeCourses.map((course) =>
             fetch(
               `/api/courses/${encodeURIComponent(course.course_id)}/forum/posts?user_id=${resolvedNumericUserId}&sort=newest`,
             ),
@@ -185,7 +223,7 @@ export default function UserProfilePage({
             const body = await forumResponse.json().catch(() => ({}));
             throw new Error(
               body?.detail
-                ?? `Failed to load forum participation for ${normalizedCourseData[index]?.course_id ?? "a course"} (HTTP ${forumResponse.status})`,
+              ?? `Failed to load forum participation for ${activeCourses[index]?.course_id ?? "a course"} (HTTP ${forumResponse.status})`,
             );
           }
         }
@@ -231,6 +269,7 @@ export default function UserProfilePage({
         });
 
         setUser(userData);
+        setActiveUserId(resolvedNumericUserId);
         setSavedCourses(normalizedCourseData);
         setBookmarkedPosts(flattenedBookmarkedPosts);
         setDiscussionActivityPosts(discussionActivity);
@@ -248,6 +287,21 @@ export default function UserProfilePage({
   }, [params]);
 
   const savedCourseCount = useMemo(() => savedCourses.length, [savedCourses]);
+  const activeSavedCourses = useMemo(
+    () => savedCourses.filter((course) => !course.is_archived),
+    [savedCourses],
+  );
+  const archivedSavedCourses = useMemo(
+    () => savedCourses.filter((course) => course.is_archived),
+    [savedCourses],
+  );
+  const effectiveShowArchivedCourses = showArchivedCourses
+    ? archivedSavedCourses.length > 0
+    : activeSavedCourses.length === 0 && archivedSavedCourses.length > 0;
+  const displayedSavedCourses = useMemo(
+    () => (effectiveShowArchivedCourses ? archivedSavedCourses : activeSavedCourses),
+    [activeSavedCourses, archivedSavedCourses, effectiveShowArchivedCourses],
+  );
   const filteredBookmarkedPosts = useMemo(() => {
     const normalizedQuery = bookmarkedSearchQuery.trim().toLowerCase();
     if (!normalizedQuery) {
@@ -347,7 +401,12 @@ export default function UserProfilePage({
                 </div>
                 <div>
                   <p className="text-xs font-medium tracking-wide text-muted-foreground">Saved courses</p>
-                  <p className="mt-1 text-base text-foreground">{savedCourseCount}</p>
+                  <p className="mt-1 text-base text-foreground">{activeSavedCourses.length}</p>
+                  {archivedSavedCourses.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {archivedSavedCourses.length} archived
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -358,19 +417,56 @@ export default function UserProfilePage({
                 <CardDescription>Courses this student has bookmarked or joined.</CardDescription>
               </CardHeader>
               <CardContent>
-                {savedCourses.length === 0 ? (
+                {savedCourseCount === 0 ? (
                   <p className="text-sm text-muted-foreground">No saved courses yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {savedCourses.map((course) => (
-                      <Link key={course.course_id} href={`/courses/${encodeURIComponent(course.course_id)}`} className="block">
-                        <div className="rounded-md border border-border/60 bg-card p-3 transition hover:border-secondary hover:shadow-sm">
-                          <p className="text-sm font-medium text-foreground">{course.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {course.course_id} · {course.subject} · {course.year}
-                          </p>
-                        </div>
-                      </Link>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-medium tracking-wide text-muted-foreground">
+                        {effectiveShowArchivedCourses ? "Archived" : "Active"}
+                      </p>
+                      <Button
+                        type="button"
+                        size="s"
+                        variant="outline"
+                        onClick={() => setShowArchivedCourses((current) => !current)}
+                      >
+                        {effectiveShowArchivedCourses
+                          ? `Show Active (${activeSavedCourses.length})`
+                          : `Show Archived (${archivedSavedCourses.length})`}
+                      </Button>
+                    </div>
+                    {displayedSavedCourses.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {effectiveShowArchivedCourses ? "No archived courses." : "No active saved courses."}
+                      </p>
+                    ) : displayedSavedCourses.map((course) => (
+                      <div
+                        key={course.course_id}
+                        className={`flex items-center justify-between gap-3 rounded-md border border-border/60 p-3 ${
+                          effectiveShowArchivedCourses ? "bg-card/70" : "bg-card"
+                        }`}
+                      >
+                        <Link href={`/courses/${encodeURIComponent(course.course_id)}`} className="min-w-0 flex-1">
+                          <div className="transition hover:opacity-90">
+                            <p className="truncate text-sm font-medium text-foreground">{course.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {course.course_id} · {course.subject} · {course.year}
+                            </p>
+                          </div>
+                        </Link>
+                        <Button
+                          type="button"
+                          size="s"
+                          variant={effectiveShowArchivedCourses ? "secondary" : "outline"}
+                          disabled={archivingCourseIds.includes(course.course_id)}
+                          onClick={() => {
+                            void setCourseArchivedState(course.course_id, !effectiveShowArchivedCourses);
+                          }}
+                        >
+                          {effectiveShowArchivedCourses ? "Restore" : "Archive"}
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 )}
