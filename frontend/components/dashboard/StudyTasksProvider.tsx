@@ -26,24 +26,54 @@ type TasksContextValue = {
 const STORAGE_KEY = "studysync-study-tasks";
 const TasksContext = createContext<TasksContextValue | null>(null);
 
+function createTaskId() {
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.getRandomValues === "function"
+  ) {
+    const values = new Uint32Array(2);
+    globalThis.crypto.getRandomValues(values);
+    return `${values[0].toString(16)}-${values[1].toString(16)}`;
+  }
+
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+}
+
 export function StudyTasksProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Load persisted tasks after mount so server and initial client HTML match.
   useEffect(() => {
+    let persistedTasks: StudyTask[] = [];
+
     try {
       const saved = JSON.parse(
         window.localStorage.getItem(STORAGE_KEY) ?? "[]"
       );
 
       if (Array.isArray(saved)) {
-        setTasks(saved);
+        persistedTasks = saved as StudyTask[];
       }
     } catch {
-      setTasks([]);
+      persistedTasks = [];
     }
 
-    setLoaded(true);
+    const timer = window.setTimeout(() => {
+      setTasks(persistedTasks);
+      setLoaded(true);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -56,7 +86,7 @@ export function StudyTasksProvider({ children }: { children: ReactNode }) {
     setTasks((current) => [
       ...current,
       {
-        id: crypto.randomUUID(),
+        id: createTaskId(),
         title: title.trim(),
         dueDate,
         course: course.trim(),

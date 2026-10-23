@@ -25,7 +25,6 @@ type UserProfile = {
 
 export default function Header() {
 
-    const [greeting, setGreeting] = useState("Guest");
     const [isHovered, setIsHovered] = useState(false);
     const [userId, setUserId] = useState<number | null>(null);
     useEffect(() => {
@@ -43,9 +42,10 @@ export default function Header() {
             })
             .then((user: UserProfile) => {
                 setUserId(user.user_id);
-                setGreeting(user.first_name);
             })
-            .catch(() => setGreeting("Guest"));
+            .catch(() => {
+                setUserId(null);
+            });
 
     }, []);
 
@@ -67,6 +67,19 @@ export default function Header() {
             {/*Options that's in the middle */}
             <NavigationMenu className="max-w-none justify-self-center -translate-y-2">
                 <NavigationMenuList className="flex items-center gap-6">
+                    <NavigationMenuItem>
+                        <NavigationMenuLink href="/dashboard" data-active="true"
+                                            className="py-2 text-sm text-foreground">
+                            Student Dashboard
+                        </NavigationMenuLink>
+                    </NavigationMenuItem>
+
+                    <NavigationMenuItem>
+                        <NavigationMenuLink href="/dashboard/study-center" className="py-2 text-sm text-foreground">
+                            Study Center
+                        </NavigationMenuLink>
+                    </NavigationMenuItem>
+
                     <NavigationMenuItem>
                         <NavigationMenuLink href="/courses/course_search" className="py-2 text-sm text-foreground">
                             Course Search

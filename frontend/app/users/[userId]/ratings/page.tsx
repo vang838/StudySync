@@ -40,13 +40,9 @@ export default function UserRatingsPage({
       setError(null);
 
       try {
-        const apiBase =
-          process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
         const [userResponse, reviewsResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
-          fetch(
-            `${apiBase}/api/v1/professor-reviews/users/${encodeURIComponent(userId)}`
-          ),
+          fetch(`/api/professor-reviews/users/${encodeURIComponent(userId)}`),
         ]);
 
         if (!userResponse.ok) {

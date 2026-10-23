@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./main.css";
 
@@ -24,7 +24,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <header>
           <div className="logo-container">
-            <a href="/" aria-label="StudySync home">
+            <Link href="/" aria-label="StudySync home">
               <Image
                 src="/StudySync.png"
                 alt="StudySync logo"
@@ -32,7 +32,7 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
                 height={48}
                 priority
               />
-            </a>
+            </Link>
           </div>
         </header>
         <main>
@@ -59,21 +59,21 @@ export default async function MainLayout({ children }: LayoutProps<"/">) {
             <div className="footer-links">
             <div>
                 <h3>StudySync</h3>
-                <a href="/">Home</a>
-                <a href="/about">About</a>
-                <a href="/features">Features</a>
+                <Link href="/">Home</Link>
+                <Link href="/about">About</Link>
+                <Link href="/features">Features</Link>
             </div>
 
             <div>
                 <h3>Support</h3>
-                <a href="/help">Help Center</a>
-                <a href="/contact">Contact Us</a>
+                <Link href="/help">Help Center</Link>
+                <Link href="/contact">Contact Us</Link>
             </div>
 
             <div>
                 <h3>Legal</h3>
-                <a href="/privacy">Privacy</a>
-                <a href="/terms">Terms of Use</a>
+                <Link href="/privacy">Privacy</Link>
+                <Link href="/terms">Terms of Use</Link>
             </div>
             </div>
 

@@ -48,6 +48,22 @@ const countReplies = (post: ForumPost): number => {
 };
 
 const PAGE_SIZE = 12;
+const MAX_THREAD_INDENT_LEVEL = 5;
+
+const ThumbsUpIcon = ({ filled = false }: { filled?: boolean }) => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className={`h-4 w-4 transition-transform duration-200 ${filled ? "fill-current" : "fill-none"}`}
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M7 10.5v8A1.5 1.5 0 0 1 5.5 20v-8A1.5 1.5 0 0 1 7 10.5Z" />
+    <path d="M10 10.5V7.5A3 3 0 0 1 13 4.5l1.8 5.4a2.5 2.5 0 0 1-.2 1.8L13.5 14H18a2 2 0 0 1 2 2l-1.3 5.3A2 2 0 0 1 16.7 22H10a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 10 10.5Z" />
+  </svg>
+);
 
 export default function CourseForumSection({ courseId, focusPostId }: CourseForumSectionProps) {
   const [forumPosts, setForumPosts] = useState<ForumPost[]>([]);
@@ -283,41 +299,159 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     const isEditing = editingPostId === post.post_id;
     const replyDraft = replyDrafts[post.post_id] ?? "";
     const showReplyEditor = activeReplyPostId === post.post_id;
-    const leftPaddingClass = depth > 0 ? "ml-4 border-l pl-4" : "";
+    const isRootPost = depth === 0;
+    const shouldIndentChildren = depth < MAX_THREAD_INDENT_LEVEL;
+    const actionButtonCount = isOwnPost && !isEditing ? 5 : 3;
+    const postSurfaceClass = isRootPost
+      ? "space-y-3 rounded-md border border-border/60 bg-card p-3"
+      : "space-y-3 rounded-md bg-card/50 p-3";
 
     return (
-      <div key={post.post_id} className={`space-y-3 rounded-md border border-border/60 bg-card p-3 ${leftPaddingClass}`}>
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{post.author_name}</span>
-            <span>{formatDateTime(post.created_at)}</span>
+      <div key={post.post_id} className="space-y-3">
+        <div className={postSurfaceClass}>
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{post.author_name}</span>
+              <span>{formatDateTime(post.created_at)}</span>
+            </div>
+            {!isEditing && <p className="text-sm text-foreground">{post.content}</p>}
+            {isEditing && (
+              <div className="space-y-2">
+                <textarea
+                  rows={3}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={editDraft}
+                  onChange={(event) => setEditDraft(event.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="s"
+                    onClick={() => {
+                      void savePostEdits(post.post_id);
+                    }}
+                    disabled={submitting || editDraft.trim().length === 0}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="s"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingPostId(null);
+                      setEditDraft("");
+                    }}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-          {!isEditing && <p className="text-sm text-foreground">{post.content}</p>}
-          {isEditing && (
-            <div className="space-y-2">
+
+          <div
+            className="grid w-full min-w-0 items-stretch gap-3"
+            style={{ gridTemplateColumns: `repeat(${actionButtonCount}, minmax(0, 1fr))` }}
+          >
+            <Button
+              size="s"
+              variant="outline"
+              onClick={() => setActiveReplyPostId(showReplyEditor ? null : post.post_id)}
+              disabled={submitting}
+              className="w-full rounded-[3px] border-border hover:border-foreground/60 hover:bg-muted/80"
+            >
+              Reply
+            </Button>
+            <Button
+              size="s"
+              variant="outline"
+              onClick={() => {
+                void toggleBookmark(post.post_id, post.is_bookmarked);
+              }}
+              disabled={submitting}
+              className={
+                post.is_bookmarked
+                  ? "w-full rounded-[3px] border-foreground/80 bg-amber-50 text-foreground hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/15"
+                  : "w-full rounded-[3px] border-foreground/60 bg-background hover:bg-amber-50/80 hover:text-foreground"
+              }
+              aria-pressed={post.is_bookmarked}
+            >
+              {post.is_bookmarked ? "Bookmarked" : "Bookmark"}
+            </Button>
+            <Button
+              size="s"
+              variant="outline"
+              onClick={() => {
+                void toggleLike(post.post_id, post.is_liked);
+              }}
+              disabled={submitting}
+              className={
+                post.is_liked
+                  ? "w-full rounded-[3px] border-foreground/80 bg-slate-100 text-foreground hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
+                  : "w-full rounded-[3px] border-foreground/60 bg-background hover:bg-slate-100 hover:text-foreground"
+              }
+              aria-pressed={post.is_liked}
+            >
+              <span className="inline-flex items-center justify-center gap-1.5">
+                <ThumbsUpIcon filled={post.is_liked} />
+                <span>{post.is_liked ? "Liked" : "Like"}</span>
+                <span>({post.like_count})</span>
+              </span>
+            </Button>
+            {isOwnPost && !isEditing && (
+              <>
+                <Button
+                  size="s"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingPostId(post.post_id);
+                    setEditDraft(post.content);
+                  }}
+                  disabled={submitting}
+                  className="w-full rounded-[3px] border-border hover:border-foreground/60 hover:bg-muted/80"
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="s"
+                  variant="destructive"
+                  onClick={() => {
+                    void deletePost(post.post_id);
+                  }}
+                  disabled={submitting}
+                  className="w-full rounded-[3px]"
+                >
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+
+          {showReplyEditor && (
+            <div className="space-y-2 rounded-md border border-dashed p-3">
               <textarea
-                rows={3}
+                rows={2}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={editDraft}
-                onChange={(event) => setEditDraft(event.target.value)}
+                placeholder="Write a reply..."
+                value={replyDraft}
+                onChange={(event) =>
+                  setReplyDrafts((prev) => ({ ...prev, [post.post_id]: event.target.value }))
+                }
               />
               <div className="flex gap-2">
                 <Button
                   size="s"
                   onClick={() => {
-                    void savePostEdits(post.post_id);
+                    void submitForumPost(replyDraft, post.post_id);
                   }}
-                  disabled={submitting || editDraft.trim().length === 0}
+                  disabled={submitting || replyDraft.trim().length === 0}
                 >
-                  Save
+                  Post Reply
                 </Button>
                 <Button
                   size="s"
                   variant="outline"
-                  onClick={() => {
-                    setEditingPostId(null);
-                    setEditDraft("");
-                  }}
+                  onClick={() => setActiveReplyPostId(null)}
                   disabled={submitting}
                 >
                   Cancel
@@ -327,97 +461,14 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="s"
-            variant="outline"
-            onClick={() => setActiveReplyPostId(showReplyEditor ? null : post.post_id)}
-            disabled={submitting}
-          >
-            Reply
-          </Button>
-          <Button
-            size="s"
-            variant={post.is_bookmarked ? "secondary" : "outline"}
-            onClick={() => {
-              void toggleBookmark(post.post_id, post.is_bookmarked);
-            }}
-            disabled={submitting}
-          >
-            {post.is_bookmarked ? "Bookmarked" : "Bookmark"}
-          </Button>
-          <Button
-            size="s"
-            variant={post.is_liked ? "secondary" : "outline"}
-            onClick={() => {
-              void toggleLike(post.post_id, post.is_liked);
-            }}
-            disabled={submitting}
-          >
-            {post.is_liked ? "Liked" : "Like"} ({post.like_count})
-          </Button>
-          {isOwnPost && !isEditing && (
-            <>
-              <Button
-                size="s"
-                variant="outline"
-                onClick={() => {
-                  setEditingPostId(post.post_id);
-                  setEditDraft(post.content);
-                }}
-                disabled={submitting}
-              >
-                Edit
-              </Button>
-              <Button
-                size="s"
-                variant="destructive"
-                onClick={() => {
-                  void deletePost(post.post_id);
-                }}
-                disabled={submitting}
-              >
-                Delete
-              </Button>
-            </>
-          )}
-        </div>
-
-        {showReplyEditor && (
-          <div className="space-y-2 rounded-md border border-dashed p-3">
-            <textarea
-              rows={2}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              placeholder="Write a reply..."
-              value={replyDraft}
-              onChange={(event) =>
-                setReplyDrafts((prev) => ({ ...prev, [post.post_id]: event.target.value }))
-              }
-            />
-            <div className="flex gap-2">
-              <Button
-                size="s"
-                onClick={() => {
-                  void submitForumPost(replyDraft, post.post_id);
-                }}
-                disabled={submitting || replyDraft.trim().length === 0}
-              >
-                Post Reply
-              </Button>
-              <Button
-                size="s"
-                variant="outline"
-                onClick={() => setActiveReplyPostId(null)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
         {post.replies.length > 0 && (
-          <div className="space-y-3">
+          <div
+            className={
+              shouldIndentChildren
+                ? "ml-4 space-y-3 border-l border-border/60 pl-4"
+                : "space-y-3"
+            }
+          >
             {post.replies.map((reply) => renderPostThread(reply, depth + 1))}
           </div>
         )}
@@ -492,7 +543,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     return "No discussion threads yet.";
   }, [discussionFilter, searchQuery]);
 
-  const renderForumSidebarPanel = (showHeaderAction: boolean): React.ReactNode => (
+  const renderForumSidebarPanel = (): React.ReactNode => (
     <Card>
       <CardHeader>
         <CardTitle>Discussion Forum</CardTitle>
@@ -635,7 +686,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
   );
 
   if (!focusMode) {
-    return <>{renderForumSidebarPanel(false)}</>;
+    return <>{renderForumSidebarPanel()}</>;
   }
 
   return (
@@ -658,7 +709,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
         </Card>
       </section>
       <aside className="space-y-6 lg:col-span-4">
-        {renderForumSidebarPanel(true)}
+        {renderForumSidebarPanel()}
       </aside>
     </div>
   );

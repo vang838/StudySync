@@ -3,12 +3,14 @@ from typing import Literal
 
 from src.application.rag_service import RAGService
 from src.ports.llm import LLMPort
+from src.schemas.retrieval import Citation
 
 
 @dataclass(frozen=True)
 class AssistantResult:
     answer: str
     mode: Literal["general", "course"]
+    citations: list[Citation]
 
 
 class AssistantService:
@@ -25,16 +27,16 @@ class AssistantService:
             raise ValueError("question must not be empty")
 
         if not course_id or not course_id.strip():
-            return AssistantResult(answer=self._llm.generate(question), mode="general")
+            return AssistantResult(answer=self._llm.generate(question), mode="general", citations=[])
 
         course_id = course_id.strip()
         mode = self._classify(question)
 
         if mode == "course":
-            answer = self._rag_service.generate(question=question, course_id=course_id)
-            return AssistantResult(answer=answer, mode="course")
+            result = self._rag_service.generate(question=question, course_id=course_id)
+            return AssistantResult(answer=result.answer, mode="course", citations=result.citations)
 
-        return AssistantResult(answer=self._llm.generate(question), mode="general")
+        return AssistantResult(answer=self._llm.generate(question), mode="general", citations=[])
 
     def _classify(self, question: str) -> Literal["general", "course"]:
         prompt = (

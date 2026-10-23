@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 
 export default function Footer() {
@@ -22,21 +23,21 @@ export default function Footer() {
                 <div className="footer-links">
                 <div>
                     <h3>StudySync</h3>
-                    <a href="/">Home</a>
-                    <a href="/about">About</a>
-                    <a href="/features">Features</a>
+                    <Link href="/">Home</Link>
+                    <Link href="/about">About</Link>
+                    <Link href="/features">Features</Link>
                 </div>
     
                 <div>
                     <h3>Support</h3>
-                    <a href="/help">Help Center</a>
-                    <a href="/contact">Contact Us</a>
+                    <Link href="/help">Help Center</Link>
+                    <Link href="/contact">Contact Us</Link>
                 </div>
     
                 <div>
                     <h3>Legal</h3>
-                    <a href="/privacy">Privacy</a>
-                    <a href="/terms">Terms of Use</a>
+                    <Link href="/privacy">Privacy</Link>
+                    <Link href="/terms">Terms of Use</Link>
                 </div>
                 </div>
     

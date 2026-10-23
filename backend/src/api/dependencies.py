@@ -40,6 +40,13 @@ from src.ports.vector_store import VectorStorePort
 from src.application.assistant_service import AssistantService
 from src.ports.llm import LLMPort
 
+import httpx
+from src.adapters.external_retrieval.searxng import SearXNGExternalRetrievalAdapter
+from src.application.evidence_ranking_service import EvidenceRankingService
+from src.application.evidence_retrieval_service import EvidenceRetrievalService
+from src.application.evidence_service import EvidenceService
+from src.ports.external_retrieval import ExternalRetrievalPort
+
 import boto3
 
 def get_embedding_port() -> Generator[EmbeddingPort, None, None]:
@@ -134,14 +141,34 @@ def get_document_vector_indexing_service(db: Session = Depends(get_db), embeddin
 def get_document_retrieval_service(db: Session = Depends(get_db), embedding_port: EmbeddingPort = Depends(get_embedding_port), vector_store: VectorStorePort = Depends(get_vector_store),) -> DocumentRetrievalService:
     return DocumentRetrievalService(db=db, embedding_port=embedding_port, vector_store=vector_store)
 
+def get_external_retrieval_port() -> Generator[ExternalRetrievalPort, None, None]:
+    if settings.external_retrieval_provider != "searxng":
+        raise RuntimeError(f"Unsupported external retrieval provider: {settings.external_retrieval_provider}")
+
+    base_url = settings.external_retrieval_base_url.strip()
+    if not base_url:
+        raise RuntimeError("EXTERNAL_RETRIEVAL_BASE_URL is not configured.")
+
+    with httpx.Client(base_url=f"{base_url.rstrip('/')}/", timeout=settings.external_retrieval_timeout) as client:
+        yield SearXNGExternalRetrievalAdapter(client=client)
+
 def get_llm_port() -> Generator[LLMPort, None, None]:
     if settings.ai_provider != "ollama":
         raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
 
     with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
         yield OllamaAdapter(client=client, model=settings.ai_model)
-        
-def get_rag_service(retrieval_service: DocumentRetrievalService = Depends(get_document_retrieval_service), llm: LLMPort = Depends(get_llm_port)) -> RAGService:
+
+def get_evidence_service() -> EvidenceService:
+    return EvidenceService()
+
+def get_evidence_ranking_service() -> EvidenceRankingService:
+    return EvidenceRankingService()
+
+def get_evidence_retrieval_service(document_retrieval: DocumentRetrievalService = Depends(get_document_retrieval_service),external_retrieval: ExternalRetrievalPort = Depends(get_external_retrieval_port),evidence_service: EvidenceService = Depends(get_evidence_service),ranking_service: EvidenceRankingService = Depends(get_evidence_ranking_service)) -> EvidenceRetrievalService:
+    return EvidenceRetrievalService(document_retrieval=document_retrieval, external_retrieval=external_retrieval, evidence_service=evidence_service, ranking_service=ranking_service)
+    
+def get_rag_service(retrieval_service: EvidenceRetrievalService = Depends(get_evidence_retrieval_service), llm: LLMPort = Depends(get_llm_port)) -> RAGService:
     return RAGService(retrieval_service=retrieval_service, llm=llm)
 
 def get_assistant_service(llm: LLMPort = Depends(get_llm_port), rag_service: RAGService = Depends(get_rag_service)) -> AssistantService:
