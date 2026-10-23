@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
+from src.schemas.retrieval import Citation
+
 class UpdateUserRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
     last_name: str = Field(min_length=1, max_length=128)
@@ -75,17 +77,14 @@ class DocumentUploadResponse(BaseModel):
     file_size_bytes: int
     status: str
 
-
 class ChatCreateRequest(BaseModel):
     course_id: str | None = None
     question: str = Field(min_length=1)
-
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"]
     content: str
     created_at: datetime
-
 
 class ChatThread(BaseModel):
     chat_id: str
@@ -96,6 +95,6 @@ class ChatThread(BaseModel):
     updated_at: datetime
     messages: list[ChatMessage]
 
-
 class ChatCreateResponse(ChatThread):
     mode: Literal["general", "course"]
+    citations: list[Citation]
