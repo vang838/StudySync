@@ -26,6 +26,11 @@ type ChatResponse = {
   mode: "general" | "course";
 };
 
+type SavedCourse = {
+  course_id: string;
+  title: string;
+};
+
 export default function AssistantWidget() {
   const pathname = usePathname();
   const params = useParams<{ courseId?: string }>();
@@ -36,8 +41,55 @@ export default function AssistantWidget() {
   const [resizing, setResizing] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(
+    courseId ?? ""
+  );
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+
+  useEffect(() => {
+    setSelectedCourseId(courseId ?? "");
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const storedUser = localStorage.getItem("studysync_user");
+    if (!storedUser) return;
+
+    let userId: number;
+
+    try {
+      const user = JSON.parse(storedUser);
+      userId = Number(user.user_id);
+    } catch {
+      return;
+    }
+
+    if (!Number.isInteger(userId) || userId < 1) return;
+
+    async function fetchSavedCourses() {
+      try {
+        const response = await fetch(
+          `/api/courses/saved?user_id=${userId}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load saved courses");
+        }
+
+        const data: SavedCourse[] = await response.json();
+        setSavedCourses(data);
+      } catch (error) {
+        console.error("Unable to load saved courses.", error);
+      }
+    }
+
+    void fetchSavedCourses();
+  }, [open]);
 
   useEffect(() => {
     const assistantWidth = open
@@ -91,9 +143,13 @@ export default function AssistantWidget() {
 
     const question = input.trim();
 
-    if (!question) {
+    if (!question || loading) {
       return;
     }
+
+    setError(null);
+    setLoading(true);
+
 
     setMessages((current) => [
       ...current,
@@ -114,7 +170,7 @@ export default function AssistantWidget() {
         },
         body: JSON.stringify({
           question,
-          ...(courseId ? { course_id: courseId } : {}),
+          ...(selectedCourseId ? { course_id: selectedCourseId } : {}),
         }),
       });
 
@@ -135,6 +191,9 @@ export default function AssistantWidget() {
       ]);
     } catch (error) {
       console.error("Unable to generate assistant response.", error);
+      setError("Failed to get a response. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -152,8 +211,9 @@ export default function AssistantWidget() {
 
       {open && (
         <aside
-          className={`fixed right-0 top-0 z-50 flex h-screen flex-col border-l bg-background shadow-xl ${resizing ? "select-none" : ""
-            }`}
+          className={`fixed right-0 top-0 z-50 flex h-screen flex-col border-l bg-background shadow-xl ${
+            resizing ? "select-none" : ""
+          }`}
           style={{
             width: `${width}px`,
             maxWidth: "66.6667vw",
@@ -173,15 +233,26 @@ export default function AssistantWidget() {
           <div className="flex items-start justify-between border-b p-4">
             <div>
               <h2 className="font-semibold">StudySync AI</h2>
-              <p className="text-sm text-muted-foreground">
-                Context: {courseId ?? "General"}
-              </p>
+              <select
+                aria-label="Select course context"
+                value={selectedCourseId}
+                onChange={(event) => setSelectedCourseId(event.target.value)}
+                disabled={loading}
+                className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+              >
+                <option value="">General</option>
+                {savedCourses.map((course) => (
+                  <option key={course.course_id} value={course.course_id}>
+                    {course.title}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="s"
               onClick={() => setOpen(false)}
             >
               Close
@@ -197,14 +268,33 @@ export default function AssistantWidget() {
               messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${message.role === "user"
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                    message.role === "user"
                       ? "ml-auto bg-primary text-primary-foreground"
                       : "mr-auto bg-muted"
-                    }`}
+                  }`}
                 >
                   {message.content}
                 </div>
               ))
+            )}
+
+            {loading && (
+              <div
+                role="status"
+                className="mr-auto max-w-[85%] rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"
+              >
+                Thinking...
+              </div>
+            )}
+
+            {error && (
+              <div
+                role="alert"
+                className="mr-auto max-w-[85%] rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {error}
+              </div>
             )}
           </div>
 
@@ -218,8 +308,8 @@ export default function AssistantWidget() {
                 className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none"
               />
 
-              <Button type="submit" disabled={!input.trim()}>
-                Send
+              <Button type="submit" disabled={!input.trim() || loading}>
+                {loading ? "Thinking..." : "Send"}
               </Button>
             </form>
           </div>
