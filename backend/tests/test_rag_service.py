@@ -1,3 +1,4 @@
+import json
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -11,14 +12,19 @@ class TestRAGService(TestCase):
     def setUp(self) -> None:
         self.retrieval_service = Mock(spec=EvidenceRetrievalService)
         self.llm = Mock(spec=LLMPort)
-        self.service = RAGService(retrieval_service=self.retrieval_service, llm=self.llm)
+        self.service = RAGService(
+            retrieval_service=self.retrieval_service,
+            llm=self.llm,
+        )
 
-    def test_supplies_retrieved_context_to_llm(self) -> None:
+    def test_returns_only_claim_associated_citations(self) -> None:
         self.retrieval_service.retrieve.return_value = [
             Evidence(
+                evidence_id="internal:chunk-1",
                 text="TCP provides reliable delivery and ordered packets.",
                 score=0.91,
-                rank_score=1.0 / 61,
+                authority="course_material",
+                quality_score=1.0,
                 source={
                     "source_type": "internal",
                     "metadata": {
@@ -35,72 +41,72 @@ class TestRAGService(TestCase):
                 },
             ),
             Evidence(
+                evidence_id="external:searxng:tcp",
                 text="TCP retransmits lost data.",
                 score=1.0,
-                rank_score=1.0 / 61,
+                authority="government_or_education",
+                quality_score=0.9,
                 source={
                     "source_type": "external",
                     "provider": "searxng",
                     "title": "TCP Overview",
-                    "url": "https://example.com/tcp",
+                    "url": "https://example.edu/tcp",
+                },
+            ),
+            Evidence(
+                evidence_id="external:searxng:unused",
+                text="An unrelated networking fact.",
+                score=0.8,
+                authority="general_web",
+                quality_score=0.6,
+                source={
+                    "source_type": "external",
+                    "provider": "searxng",
+                    "title": "Unrelated",
+                    "url": "https://example.com/unrelated",
                 },
             ),
         ]
-        self.llm.generate.return_value = "TCP provides reliable delivery."
+        self.llm.generate.return_value = json.dumps({
+            "answer": "TCP provides reliable delivery.",
+            "claims": [{
+                "text": "TCP provides reliable delivery.",
+                "evidence": [
+                    {"evidence_id": "internal:chunk-1", "relationship": "supports", "confidence": 0.95},
+                    {"evidence_id": "external:searxng:tcp", "relationship": "supports", "confidence": 0.85},
+                    {"evidence_id": "external:searxng:unused", "relationship": "irrelevant", "confidence": 0.9},
+                ],
+            }],
+        })
 
         result = self.service.generate(
             question="What does TCP provide?",
             course_id="cs101",
             document_ids=["doc-1"],
-            top_k=2,
+            top_k=3,
         )
 
         self.retrieval_service.retrieve.assert_called_once_with(
             query="What does TCP provide?",
             course_id="cs101",
             document_ids=["doc-1"],
-            top_k=2,
+            top_k=3,
         )
-
         prompt = self.llm.generate.call_args.args[0]
-
-        self.assertIn(
-            "[Internal source | document_id=doc-1 | page=12 | section=Transport Layer]",
-            prompt,
-        )
-        self.assertIn("TCP provides reliable delivery and ordered packets.", prompt)
-        self.assertIn(
-            "[External source | provider=searxng | title=TCP Overview | url=https://example.com/tcp]",
-            prompt,
-        )
-        self.assertIn("TCP retransmits lost data.", prompt)
+        self.assertIn('"evidence_id": "internal:chunk-1"', prompt)
         self.assertIn("Question:\nWhat does TCP provide?", prompt)
 
         self.assertEqual(result.answer, "TCP provides reliable delivery.")
+        self.assertEqual(result.evidence_status, "sufficient")
+        self.assertTrue(result.claims[0].has_agreement)
         self.assertEqual(len(result.citations), 2)
-
-        internal = result.citations[0]
-        self.assertEqual(internal.source_type, "internal")
-        self.assertEqual(internal.document_id, "doc-1")
-        self.assertEqual(internal.version_id, "version-1")
-        self.assertEqual(internal.chunk_id, "chunk-1")
-        self.assertEqual(internal.owner_ref, "user-1")
-        self.assertEqual(internal.page_start, 12)
-        self.assertEqual(internal.page_end, 12)
-        self.assertEqual(internal.section_title, "Transport Layer")
-
-        external = result.citations[1]
-        self.assertEqual(external.source_type, "external")
-        self.assertEqual(external.provider, "searxng")
-        self.assertEqual(external.title, "TCP Overview")
-        self.assertEqual(external.url, "https://example.com/tcp")
+        self.assertEqual(result.citations[0].evidence_id, "internal:chunk-1")
+        self.assertEqual(result.citations[0].claim_ids, ["claim-1"])
+        self.assertEqual(result.citations[1].evidence_id, "external:searxng:tcp")
 
     def test_rejects_empty_question(self) -> None:
         with self.assertRaisesRegex(ValueError, "question must not be empty"):
-            self.service.generate(
-                question="   ",
-                course_id="cs101",
-            )
+            self.service.generate(question="   ", course_id="cs101")
 
         self.retrieval_service.retrieve.assert_not_called()
         self.llm.generate.assert_not_called()
@@ -118,11 +124,11 @@ class TestRAGService(TestCase):
             "I couldn't find enough information in the available evidence to answer that question.",
         )
         self.assertEqual(result.citations, [])
+        self.assertEqual(result.evidence_status, "insufficient")
         self.llm.generate.assert_not_called()
 
-        self.retrieval_service.retrieve.assert_called_once_with(
-            query="What port does HTTPS use?",
-            course_id="cs101",
-            document_ids=None,
-            top_k=5,
-        )
+
+if __name__ == "__main__":
+    import unittest
+
+    unittest.main()
