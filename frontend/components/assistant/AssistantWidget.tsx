@@ -14,22 +14,155 @@ import { Button } from "@/components/ui/button";
 const MIN_WIDTH = 320;
 const DEFAULT_WIDTH = 420;
 
+type InternalCitation = {
+  source_type: "internal";
+  evidence_id: string | null;
+  claim_ids: string[];
+  document_id: string;
+  page_start: number | null;
+  page_end: number | null;
+  section_title: string | null;
+};
+
+type ExternalCitation = {
+  source_type: "external";
+  evidence_id: string | null;
+  claim_ids: string[];
+  provider: string;
+  title: string | null;
+  url: string;
+};
+
+type Citation = InternalCitation | ExternalCitation;
+
+type ClaimEvidenceAssociation = {
+  evidence_id: string;
+  relationship: "supports" | "contradicts" | "irrelevant";
+  confidence: number;
+};
+
+type GeneratedClaim = {
+  claim_id: string;
+  text: string;
+  evidence: ClaimEvidenceAssociation[];
+  has_agreement: boolean;
+  has_conflict: boolean;
+  is_insufficient: boolean;
+};
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   mode?: "general" | "course";
+  evidenceStatus?: "not_applicable" | "sufficient" | "conflicting" | "insufficient";
+  citations?: Citation[];
+  claims?: GeneratedClaim[];
 };
 
 type ChatResponse = {
   answer: string;
   mode: "general" | "course";
+  evidence_status: "not_applicable" | "sufficient" | "conflicting" | "insufficient";
+  citations: Citation[];
+  claims: GeneratedClaim[];
 };
 
 type SavedCourse = {
   course_id: string;
   title: string;
 };
+
+function internalCitationLabel(citation: InternalCitation) {
+  const location = citation.page_start
+    ? citation.page_end && citation.page_end !== citation.page_start
+      ? `pages ${citation.page_start}-${citation.page_end}`
+      : `page ${citation.page_start}`
+    : null;
+
+  return [citation.section_title, location, `document ${citation.document_id}`]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function CitationList({ citations, claim }: { citations: Citation[]; claim: GeneratedClaim }) {
+  const claimCitations = citations.filter((citation) =>
+    citation.claim_ids.includes(claim.claim_id)
+  );
+
+  if (claimCitations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 border-t border-border/60 pt-2 text-xs">
+      <div className="font-medium">Sources</div>
+      <ol className="mt-1 list-decimal space-y-1 pl-4 text-muted-foreground">
+        {claimCitations.map((citation, index) => {
+          const relationship = claim.evidence.find(
+            (association) => association.evidence_id === citation.evidence_id
+          )?.relationship;
+
+          return (
+            <li key={citation.evidence_id ?? `${citation.source_type}-${index}`}>
+              <span className={relationship === "contradicts" ? "font-medium text-amber-700 dark:text-amber-400" : "font-medium"}>
+                {relationship === "contradicts" ? "Conflicts" : "Supports"}
+              </span>
+              {" — "}
+              {citation.source_type === "external" ? (
+                <a
+                  href={citation.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {citation.title ?? citation.url}
+                </a>
+              ) : (
+                internalCitationLabel(citation)
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function AssistantMessageContent({ message }: { message: ChatMessage }) {
+  const claims = message.claims ?? [];
+  const hasUnresolvedClaim = claims.some((claim) => claim.is_insufficient);
+
+  if (claims.length === 0) {
+    return <div>{message.content}</div>;
+  }
+
+  if (hasUnresolvedClaim) {
+    return (
+      <>
+        <div>{message.content}</div>
+        {message.evidenceStatus === "conflicting" && claims.map((claim) => (
+          <div key={claim.claim_id} className="mt-3 border-t border-border/60 pt-2">
+            <div className="text-xs font-medium">Disputed claim</div>
+            <div className="mt-1">{claim.text}</div>
+            <CitationList citations={message.citations ?? []} claim={claim} />
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {claims.map((claim) => (
+        <div key={claim.claim_id}>
+          <div>{claim.text}</div>
+          <CitationList citations={message.citations ?? []} claim={claim} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AssistantWidget() {
   const pathname = usePathname();
@@ -51,6 +184,8 @@ export default function AssistantWidget() {
   const resizeStartWidth = useRef(0);
 
   useEffect(() => {
+    // Route navigation is external state and must reset a prior manual selection.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedCourseId(courseId ?? "");
   }, [courseId]);
 
@@ -193,6 +328,9 @@ export default function AssistantWidget() {
           role: "assistant",
           content: data.answer,
           mode: data.mode,
+          evidenceStatus: data.evidence_status,
+          citations: data.citations,
+          claims: data.claims,
         },
       ]);
     } catch (error) {
@@ -281,7 +419,17 @@ export default function AssistantWidget() {
                       : "mr-auto bg-muted"
                     }`}
                 >
-                  {message.content}
+                  {message.evidenceStatus === "conflicting" && (
+                    <div className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                      Conflicting evidence detected
+                    </div>
+                  )}
+                  {message.evidenceStatus === "insufficient" && (
+                    <div className="mt-2 text-xs font-medium text-muted-foreground">
+                      Evidence was insufficient
+                    </div>
+                  )}
+                  <AssistantMessageContent message={message} />
                 </div>
               ))
             )}

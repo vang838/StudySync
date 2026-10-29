@@ -8,15 +8,13 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from src.db.models import ChatMessageRecord, ChatThreadRecord
-from src.db.session import get_db
-from src.schemas.contracts import ChatCreateRequest, ChatCreateResponse, ChatMessage, ChatThread
 from src.api.dependencies import get_assistant_service
 from src.application.assistant_service import AssistantService
-from src.ports.llm import (
-    LLMResponseError,
-    LLMUnavailableError,
-)
+from src.db.chat_evidence_models import ChatEvidenceAssessmentRecord
+from src.db.models import ChatMessageRecord, ChatThreadRecord
+from src.db.session import get_db
+from src.ports.llm import LLMResponseError, LLMUnavailableError
+from src.schemas.contracts import ChatCreateRequest, ChatCreateResponse, ChatMessage, ChatThread
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -24,7 +22,22 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
-def _thread_to_schema(thread: ChatThreadRecord) -> ChatThread:
+
+def _thread_to_schema(
+    thread: ChatThreadRecord,
+    assessment: ChatEvidenceAssessmentRecord | None,
+) -> ChatThread:
+    if assessment is None:
+        mode = "course" if thread.course_id else "general"
+        evidence_status = "not_applicable"
+        citations = []
+        claims = []
+    else:
+        mode = assessment.mode
+        evidence_status = assessment.evidence_status
+        citations = assessment.citations
+        claims = assessment.claims
+
     return ChatThread(
         chat_id=thread.chat_id,
         course_id=thread.course_id,
@@ -36,32 +49,45 @@ def _thread_to_schema(thread: ChatThreadRecord) -> ChatThread:
             ChatMessage(role=message.role, content=message.content, created_at=message.created_at)
             for message in thread.messages
         ],
+        mode=mode,
+        evidence_status=evidence_status,
+        citations=citations,
+        claims=claims,
     )
 
 
 @router.post("", response_model=ChatCreateResponse, status_code=status.HTTP_201_CREATED)
-def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db), assistant_service: AssistantService = Depends(get_assistant_service),) -> ChatCreateResponse:
+def create_chat(
+    payload: ChatCreateRequest,
+    db: Session = Depends(get_db),
+    assistant_service: AssistantService = Depends(get_assistant_service),
+) -> ChatCreateResponse:
     try:
-        result = assistant_service.generate(question=payload.question, course_id=payload.course_id)
-        answer = result.answer
-
+        result = assistant_service.generate(
+            question=payload.question,
+            course_id=payload.course_id,
+        )
     except LLMUnavailableError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="AI inference service is unavailable.",) from exc
-
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI inference service is unavailable.",
+        ) from exc
     except LLMResponseError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI inference returned an error")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI inference returned an error",
+        ) from exc
 
     now = _utcnow()
     chat_id = uuid4().hex
-
     thread = ChatThreadRecord(
         chat_id=chat_id,
         course_id=payload.course_id,
         question=payload.question,
-        answer=answer,
+        answer=result.answer,
         created_at=now,
         updated_at=now,
-        messages = [
+        messages=[
             ChatMessageRecord(
                 role="user",
                 content=payload.question,
@@ -69,20 +95,31 @@ def create_chat(payload: ChatCreateRequest, db: Session = Depends(get_db), assis
             ),
             ChatMessageRecord(
                 role="assistant",
-                content=answer,
+                content=result.answer,
                 created_at=now,
-            )
+            ),
         ],
+    )
+    assessment = ChatEvidenceAssessmentRecord(
+        chat_id=chat_id,
+        mode=result.mode,
+        evidence_status=result.evidence_status,
+        citations=[citation.model_dump(mode="json") for citation in result.citations],
+        claims=[claim.model_dump(mode="json") for claim in result.claims],
+        created_at=now,
     )
 
     db.add(thread)
+    db.flush()
+    db.add(assessment)
     db.commit()
     db.refresh(thread)
-    return ChatCreateResponse(
-        **_thread_to_schema(thread).model_dump(),
-        mode=result.mode,
-        citations=result.citations,
+    db.refresh(assessment)
+
+    return ChatCreateResponse.model_validate(
+        _thread_to_schema(thread, assessment).model_dump()
     )
+
 
 @router.get("/{chat_id}", response_model=ChatThread)
 def get_chat(chat_id: str, db: Session = Depends(get_db)) -> ChatThread:
@@ -97,7 +134,13 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)) -> ChatThread:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Chat '{chat_id}' was not found.",
         )
-    return _thread_to_schema(thread)
+
+    assessment = db.scalar(
+        select(ChatEvidenceAssessmentRecord).where(
+            ChatEvidenceAssessmentRecord.chat_id == chat_id
+        )
+    )
+    return _thread_to_schema(thread, assessment)
 
 
 @router.get("/{chat_id}/stream")
