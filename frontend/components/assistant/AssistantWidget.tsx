@@ -19,6 +19,7 @@ type InternalCitation = {
   evidence_id: string | null;
   claim_ids: string[];
   document_id: string;
+  original_filename?: string | null;
   page_start: number | null;
   page_end: number | null;
   section_title: string | null;
@@ -80,7 +81,7 @@ function internalCitationLabel(citation: InternalCitation) {
       : `page ${citation.page_start}`
     : null;
 
-  return [citation.section_title, location, `document ${citation.document_id}`]
+  return [citation.original_filename ?? `document ${citation.document_id}`, citation.section_title, location]
     .filter(Boolean)
     .join(" · ");
 }
@@ -167,7 +168,13 @@ function AssistantMessageContent({ message }: { message: ChatMessage }) {
 export default function AssistantWidget() {
   const pathname = usePathname();
   const params = useParams<{ courseId?: string }>();
-  const courseId = params.courseId;
+  let courseId = params.courseId;
+
+  try {
+    courseId = courseId ? decodeURIComponent(courseId) : undefined;
+  } catch {
+    // Already decoded course IDs can contain a literal percent sign.
+  }
 
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);

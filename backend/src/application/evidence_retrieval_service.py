@@ -1,4 +1,5 @@
 from src.application.document_retrieval_service import DocumentRetrievalService
+from src.application.document_reference import references_course_document
 from src.application.evidence_ranking_service import EvidenceRankingService
 from src.application.evidence_service import EvidenceService
 from src.application.source_quality_service import SourceQualityService
@@ -37,7 +38,8 @@ class EvidenceRetrievalService:
             document_ids=document_ids,
             top_k=top_k,
         )
-        external_results = self._external_retrieval.search(query, top_k=top_k)
+        # Web search cannot identify the contents of a student's uploaded file.
+        external_results = [] if references_course_document(query) else self._external_retrieval.search(query, top_k=top_k)
 
         internal_evidence = self._quality_service.evaluate_all([
             self._evidence_service.from_internal(result)

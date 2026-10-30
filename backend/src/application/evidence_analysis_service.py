@@ -41,16 +41,28 @@ class EvidenceAnalysisService:
         self._llm = llm
 
     def generate(self, *, question: str, evidence: list[Evidence]) -> EvidenceAnalysisResult:
-        proposed = self._parse_response(self._llm.generate(self._build_prompt(question, evidence)))
+        response_schema = _ProposedAnswer.model_json_schema()
+        response_schema["$defs"]["_ProposedAssociation"]["properties"]["evidence_id"]["enum"] = [
+            item.evidence_id for item in evidence if item.evidence_id is not None
+        ]
+        proposed = self._parse_response(self._llm.generate(
+            self._build_prompt(question, evidence), response_schema=response_schema,
+        ))
         evidence_by_id = {
             item.evidence_id: item
             for item in evidence
             if item.evidence_id is not None
         }
 
+        # A repeated question is not an answer claim, even if the model assigns it evidence.
+        question_text = " ".join(question.split()).rstrip("?.!").casefold()
+        answer_claims = [
+            claim for claim in proposed.claims
+            if " ".join(claim.text.split()).rstrip("?.!").casefold() != question_text
+        ]
         claims = [
             self._assess_claim(index, claim, evidence_by_id)
-            for index, claim in enumerate(proposed.claims, start=1)
+            for index, claim in enumerate(answer_claims, start=1)
         ]
         answer = " ".join(claim.text.strip() for claim in claims)
         has_conflict = any(claim.has_conflict for claim in claims)
@@ -174,6 +186,7 @@ class EvidenceAnalysisService:
                 "evidence_id": item.evidence_id,
                 "authority": item.authority,
                 "quality_score": item.quality_score,
+                "source": item.source.model_dump(mode="json"),
                 "text": item.text,
             }
             for item in evidence
@@ -185,9 +198,10 @@ class EvidenceAnalysisService:
             "Return only valid JSON with this exact shape:\n"
             '{"claims":[{"text":"one complete factual sentence","evidence":'
             '[{"evidence_id":"...","relationship":"supports|contradicts|irrelevant",'
-            '"confidence":0.0}]}]}\n'
+            '"confidence":0.9}]}]}\n'
             "List every factual claim in the answer separately. Associate only evidence IDs from the input. "
+            "Write complete factual sentences that answer the question. Do not repeat the question as a claim. "
             "Mark evidence that directly supports or contradicts each claim. If reliable evidence is not "
-            "sufficient, make that clear in the answer and do not invent facts.\n\n"
+            'sufficient to answer, return {"claims": []}. Do not invent facts.\n\n'
             f"Evidence:\n{json.dumps(evidence_payload)}\n\nQuestion:\n{question}"
         )

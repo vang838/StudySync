@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {useSyncExternalStore} from "react";
+import {useEffect, useState} from "react";
 import {HugeiconsIcon} from "@hugeicons/react";
 import {
     ArrowRight01Icon,
@@ -21,67 +21,12 @@ import {
 import StudyCalendar from "@/components/dashboard/StudyCalendar";
 import {useStudyTasks} from "@/components/dashboard/StudyTasksProvider";
 
-const courses = [
-    {code: "BIO 201", name: "Human Biology", progress: 72},
-    {
-        code: "MATH 240",
-        name: "Statistics & Probability",
-        progress: 48,
-    },
-    {code: "HIST 108", name: "World History", progress: 85},
-];
-
-let cachedSavedCoursesRaw: string | null = null;
-let cachedSavedCoursesSnapshot = courses;
-
-function getSavedCoursesSnapshot() {
-    if (typeof window === "undefined") {
-        return courses;
-    }
-
-    try {
-        const raw = window.localStorage.getItem("saved_courses");
-        if (!raw) {
-            return courses;
-        }
-
-        if (raw === cachedSavedCoursesRaw) {
-            return cachedSavedCoursesSnapshot;
-        }
-
-        const parsedCourses = JSON.parse(raw);
-        if (Array.isArray(parsedCourses) && parsedCourses.length > 0) {
-            cachedSavedCoursesRaw = raw;
-            cachedSavedCoursesSnapshot = parsedCourses;
-            return cachedSavedCoursesSnapshot;
-        }
-    } catch (error) {
-        console.warn("Unable to load saved courses from localStorage.", error);
-    }
-
-    cachedSavedCoursesRaw = null;
-    cachedSavedCoursesSnapshot = courses;
-    return courses;
-}
-
-function subscribeToSavedCourses(onStoreChange: () => void) {
-    if (typeof window === "undefined") {
-        return () => {
-        };
-    }
-
-    const handleStorageChange = (event: StorageEvent) => {
-        if (!event.key || event.key === "saved_courses") {
-            onStoreChange();
-        }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-        window.removeEventListener("storage", handleStorageChange);
-    };
-}
+type SavedCourse = {
+    course_id: string;
+    title: string;
+    subject: string;
+    year: number;
+};
 
 const uploads = [
     {
@@ -149,23 +94,58 @@ function SectionHeading({
 
 export default function StudentDashboardPage() {
     const {tasks, toggleTask} = useStudyTasks();
+    const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+    const [coursesLoading, setCoursesLoading] = useState(true);
+    const [coursesError, setCoursesError] = useState("");
     const upcomingTasks = tasks
         .filter((task) => !task.completed)
         .sort((first, second) => first.dueDate.localeCompare(second.dueDate))
         .slice(0, 5);
 
-    const savedCourses = useSyncExternalStore(
-        subscribeToSavedCourses,
-        getSavedCoursesSnapshot,
-        () => courses
-    );
+    useEffect(() => {
+        const controller = new AbortController();
 
-    const averageProgress = Math.round(
-        savedCourses.reduce(
-            (total, course) => total + course.progress,
-            0
-        ) / savedCourses.length
-    );
+        async function loadSavedCourses() {
+            try {
+                const userId = Number(window.localStorage.getItem("user_id"));
+                if (!Number.isInteger(userId) || userId <= 0) {
+                    throw new Error("Sign in to view your saved courses.");
+                }
+
+                const response = await fetch(`/api/courses/saved?user_id=${userId}`, {
+                    signal: controller.signal,
+                    cache: "no-store",
+                });
+                if (!response.ok) {
+                    throw new Error("Unable to load your saved courses. Please refresh to try again.");
+                }
+
+                const data: unknown = await response.json();
+                if (!Array.isArray(data) || !data.every((course) =>
+                    typeof course?.course_id === "string" && typeof course?.title === "string" &&
+                    typeof course?.subject === "string" && Number.isInteger(course?.year)
+                )) {
+                    throw new Error("Unable to load your saved courses. Please refresh to try again.");
+                }
+
+                if (!controller.signal.aborted) {
+                    setSavedCourses(data);
+                }
+            } catch (error) {
+                if (!controller.signal.aborted) {
+                    setCoursesError(error instanceof Error ? error.message : "Unable to load your saved courses.");
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setCoursesLoading(false);
+                }
+            }
+        }
+
+        void loadSavedCourses();
+
+        return () => controller.abort();
+    }, []);
 
     return (
         <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
@@ -240,7 +220,7 @@ export default function StudentDashboardPage() {
                         {[
                             {
                                 label: "Saved courses",
-                                value: String(savedCourses.length),
+                                value: coursesLoading || coursesError ? "—" : String(savedCourses.length),
                                 icon: BookOpen01Icon,
                             },
                             {
@@ -250,7 +230,7 @@ export default function StudentDashboardPage() {
                             },
                             {
                                 label: "Average progress",
-                                value: averageProgress + "%",
+                                value: "—",
                                 icon: Clock01Icon,
                             },
                         ].map((stat) => (
@@ -285,10 +265,21 @@ export default function StudentDashboardPage() {
                             />
 
                             <div className="grid gap-4 md:grid-cols-3">
+                                {coursesLoading && (
+                                    <p role="status" className="text-sm text-muted-foreground">Loading saved courses...</p>
+                                )}
+                                {coursesError && (
+                                    <p role="alert" className="text-sm text-destructive">{coursesError}</p>
+                                )}
+                                {!coursesLoading && !coursesError && savedCourses.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">
+                                        No saved courses yet. <Link href="/courses/course_search" className="underline">Browse courses</Link> to save one.
+                                    </p>
+                                )}
                                 {savedCourses.map((course) => (
                                     <Link
-                                        key={course.code}
-                                        href={`/courses/${encodeURIComponent(course.code)}`}
+                                        key={course.course_id}
+                                        href={`/courses/${encodeURIComponent(course.course_id)}`}
                                         className="block"
                                     >
                                         <Card
@@ -297,36 +288,17 @@ export default function StudentDashboardPage() {
                                         >
                                             <CardHeader>
                                                 <p className="text-xs font-semibold text-secondary">
-                                                    {course.code}
+                                                    {course.course_id}
                                                 </p>
                                                 <CardTitle className="text-sm">
-                                                    {course.name}
+                                                    {course.title}
                                                 </CardTitle>
                                             </CardHeader>
 
                                             <CardContent>
-                                                <div className="flex justify-between text-xs text-muted-foreground">
-                                                    <span>Sample progress</span>
-                                                    <span>{course.progress}%</span>
-                                                </div>
-
-                                                <div
-                                                    className="mt-2 h-2 overflow-hidden rounded-full bg-background"
-                                                    role="progressbar"
-                                                    aria-label={
-                                                        course.name + " progress"
-                                                    }
-                                                    aria-valuenow={course.progress}
-                                                    aria-valuemin={0}
-                                                    aria-valuemax={100}
-                                                >
-                                                    <div
-                                                        className="h-full rounded-full bg-secondary"
-                                                        style={{
-                                                            width: course.progress + "%",
-                                                        }}
-                                                    />
-                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {course.subject} · {course.year}
+                                                </p>
                                             </CardContent>
                                         </Card>
                                     </Link>

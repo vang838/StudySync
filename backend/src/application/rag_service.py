@@ -107,6 +107,7 @@ class RAGService:
                 evidence_id=evidence.evidence_id,
                 claim_ids=claim_ids,
                 document_id=metadata.document_id,
+                original_filename=metadata.original_filename,
                 version_id=metadata.version_id,
                 chunk_id=metadata.chunk_id,
                 owner_ref=metadata.owner_ref,

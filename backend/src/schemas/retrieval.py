@@ -9,6 +9,7 @@ class ChunkRetrievalMetadata(BaseModel):
     version_id: str
     chunk_id: str
     course_id: str
+    original_filename: str | None = None
     owner_ref: str | None = None
     chunk_index: int = Field(ge=0)
     source_start_index: int | None = None
@@ -84,6 +85,7 @@ class InternalCitation(BaseModel):
     evidence_id: str | None = None
     claim_ids: list[str] = Field(default_factory=list)
     document_id: str
+    original_filename: str | None = None
     version_id: str
     chunk_id: str
     owner_ref: str | None = None

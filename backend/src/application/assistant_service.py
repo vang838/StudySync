@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
+from src.application.document_reference import references_course_document
 from src.application.rag_service import RAGService
 from src.ports.llm import LLMPort
 from src.schemas.retrieval import Citation, GeneratedClaim
@@ -55,6 +56,10 @@ class AssistantService:
         )
 
     def _classify(self, question: str) -> Literal["general", "course"]:
+        # An explicit document reference requires retrieval, regardless of the model's label.
+        if references_course_document(question):
+            return "course"
+
         prompt = (
             "Classify whether the user's question requires the current course material to answer correctly.\n"
             "Return exactly COURSE or GENERAL.\n"

@@ -13,8 +13,9 @@ class OllamaAdapter:
         self._client = client
         self._model = model
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompt: str, *, response_schema: dict | None = None) -> str:
         """Gen response using configured model."""
+        format_options = {"format": response_schema, "options": {"temperature": 0}} if response_schema is not None else {}
         try:
             response = self._client.chat(
                 model=self._model,
@@ -25,6 +26,7 @@ class OllamaAdapter:
                     }
                 ],
                 stream=False,
+                **format_options,
             )
         except ResponseError as exc:
             raise LLMResponseError("Inference service rejected request") from exc

@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.db.models import DocumentChunkRecord
+from src.application.document_reference import matches_document_filename, references_named_document
+from src.db.models import DocumentChunkRecord, DocumentRecord, DocumentVersionRecord
 from src.ports.embedding import EmbeddingPort
 from src.ports.vector_store import VectorMetadataValue, VectorStorePort
 
@@ -61,6 +62,25 @@ class DocumentRetrievalService:
 
             normalized_document_ids = list(dict.fromkeys(normalized_document_ids))
 
+        source_filenames: dict[str, str] = {}
+        if references_named_document(query):
+            rows = self._db.execute(
+                select(DocumentRecord.document_id, DocumentVersionRecord.original_filename)
+                .join(DocumentVersionRecord, DocumentVersionRecord.document_id == DocumentRecord.document_id)
+                .where(DocumentRecord.course_id == course_id)
+            ).all()
+            # Match stored filenames so spaces and punctuation remain part of the name.
+            source_filenames = {
+                document_id: filename for document_id, filename in rows
+                if matches_document_filename(query, filename)
+            }
+            matching_ids = list(source_filenames)
+            if normalized_document_ids is not None:
+                matching_ids = [document_id for document_id in matching_ids if document_id in normalized_document_ids]
+            if not matching_ids:
+                return []
+            normalized_document_ids = matching_ids
+
         query_vector = self._embedding_port.embed_query(query)
 
         metadata_filter: dict[str, object] = {
@@ -114,8 +134,13 @@ class DocumentRetrievalService:
             if chunk is None:
                 continue
 
+            metadata = dict(match.metadata)
+            filename = source_filenames.get(metadata.get("document_id"))
+            if filename:
+                metadata["original_filename"] = filename
+
             results.append(
-                RetrievedChunk(chunk_id=chunk.chunk_id, text=chunk.text, score=match.score, metadata=match.metadata)
+                RetrievedChunk(chunk_id=chunk.chunk_id, text=chunk.text, score=match.score, metadata=metadata)
             )
 
         return results
