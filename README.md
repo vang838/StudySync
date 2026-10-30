@@ -138,6 +138,29 @@ Exit `psql` with:
 \q
 ```
 
+## Document Storage Setup
+Document uploads support Cloudflare R2 and local filesystem storage.
+
+- Use `OBJECT_STORAGE_PROVIDER=local` for fully local development.
+- Use `OBJECT_STORAGE_PROVIDER=r2` to store uploaded files in Cloudflare R2.
+
+### Local filesystem storage (recommended for local testing)
+```powershell
+cd backend
+$env:OBJECT_STORAGE_PROVIDER = "local"
+$env:LOCAL_OBJECT_STORAGE_ROOT = ".local-object-storage"
+```
+
+### Cloudflare R2 storage
+```powershell
+cd backend
+$env:OBJECT_STORAGE_PROVIDER = "r2"
+$env:R2_ENDPOINT_URL = "<your-r2-endpoint>"
+$env:R2_ACCESS_KEY_ID = "<your-r2-access-key>"
+$env:R2_SECRET_ACCESS_KEY = "<your-r2-secret>"
+$env:R2_BUCKET_NAME = "<your-r2-bucket>"
+```
+
 ## System Architecture
 StudySync follows a simple browser-to-backend pattern.
 
@@ -171,7 +194,9 @@ The API should stay versioned and resource-oriented under `/api/v1`.
 - `POST /api/v1/courses` - create a course.
 - `GET /api/v1/courses/{course_id}` - fetch course details.
 - `POST /api/v1/documents` - upload a document for ingestion.
-- `GET /api/v1/documents` - list uploaded documents.
+- `GET /api/v1/documents` - list uploaded documents (published only by default, add `published_only=false` to include private uploads).
+- `PATCH /api/v1/documents/{document_id}/publish` - toggle whether an uploaded document is published to a class.
+- `DELETE /api/v1/documents/{document_id}` - remove an uploaded document and its versions.
 - `POST /api/v1/chat` - create a question, start answer generation, and return either a full response or an SSE stream.
 - `GET /api/v1/chat/{chat_id}` - fetch a chat thread and its messages.
 - `GET /api/v1/chat/{chat_id}/stream` - stream the answer as SSE tokens.
@@ -186,6 +211,12 @@ Use the backend settings and frontend API base URL that the app expects.
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | Frontend | Base URL for the FastAPI API, such as `http://localhost:8000`. |
 | `DATABASE_URL` | Backend | PostgreSQL connection string used by FastAPI. |
+| `OBJECT_STORAGE_PROVIDER` | Backend | Object storage provider for document files (`local` or `r2`). |
+| `LOCAL_OBJECT_STORAGE_ROOT` | Backend | Root folder used when `OBJECT_STORAGE_PROVIDER=local`. |
+| `R2_ENDPOINT_URL` | Backend | Cloudflare R2 S3 endpoint used when `OBJECT_STORAGE_PROVIDER=r2`. |
+| `R2_ACCESS_KEY_ID` | Backend | Cloudflare R2 access key used when `OBJECT_STORAGE_PROVIDER=r2`. |
+| `R2_SECRET_ACCESS_KEY` | Backend | Cloudflare R2 secret key used when `OBJECT_STORAGE_PROVIDER=r2`. |
+| `R2_BUCKET_NAME` | Backend | Cloudflare R2 bucket used when `OBJECT_STORAGE_PROVIDER=r2`. |
 | `CORS_ORIGINS` | Backend | Comma-separated list of allowed browser origins. |
 | `AI_PROVIDER` | Backend | Which model provider to use. |
 | `AI_API_KEY` | Backend | API key for the selected model provider. |

@@ -1,7 +1,7 @@
-// frontend/app/courses/[courseId]/page.tsx
-import { Metadata } from "next";
-import CourseOverview from "@/components/course-overview/CourseOverview";
+import { redirect } from "next/navigation";
 
+export default function LegacyCourseRoute() {
+  redirect("/courses/course_search");
 // Generate static metadata for the page. You might need to adjust this
 // based on how you fetch course data.
 export const metadata: Metadata = {

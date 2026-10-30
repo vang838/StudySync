@@ -76,6 +76,12 @@ def init_db() -> None:
                 )
             )
 
+    if "documents" in table_names:
+        column_names = {column["name"] for column in inspector.get_columns("documents")}
+        if "is_published" not in column_names:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE documents ADD COLUMN is_published BOOLEAN NOT NULL DEFAULT FALSE"))
+
     # 2. Seed initial data for the Course table
     SessionLocal = get_session_factory()
     with SessionLocal() as session:

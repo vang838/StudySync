@@ -24,11 +24,25 @@ export default function UploadDocumentsPage() {
   useEffect(() => {
     async function loadCourses() {
       try {
-        const userId = Number(localStorage.getItem("user_id"));
+        const rawUserId = localStorage.getItem("user_id");
+        let userId = rawUserId ? Number(rawUserId) : NaN;
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+          const rawLegacyUser = localStorage.getItem("studysync_user");
+
+          if (!rawLegacyUser) {
+            throw new Error("Please sign in first.");
+          }
+
+          const legacyUser = JSON.parse(rawLegacyUser);
+          userId = Number(legacyUser?.user_id);
+        }
 
         if (!Number.isInteger(userId) || userId <= 0) {
           throw new Error("Please sign in first.");
         }
+
+        localStorage.setItem("user_id", String(userId));
 
         const response = await fetch(
           `/api/courses/saved?user_id=${userId}`

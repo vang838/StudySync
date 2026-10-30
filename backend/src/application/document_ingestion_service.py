@@ -68,6 +68,7 @@ class DocumentIngestionService:
             course_id=course_id,
             owner_ref=None,
             title=title,
+            is_published=False,
         )
 
         version = DocumentVersionRecord(
