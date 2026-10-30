@@ -82,6 +82,33 @@ class DocumentUploadResponse(BaseModel):
     status: str
 
 
+class DocumentListItemResponse(BaseModel):
+    document_id: str
+    version_id: str
+    course_id: str
+    title: str
+    is_published: bool
+    original_filename: str
+    file_size_bytes: int
+    created_at: datetime
+
+
+class DocumentPublishRequest(BaseModel):
+    is_published: bool
+
+
+class DocumentPublishResponse(BaseModel):
+    document_id: str
+    is_published: bool
+
+
+class DocumentDeleteResponse(BaseModel):
+    document_id: str
+    deleted: bool
+    storage_cleanup_status: Literal["complete", "partial"]
+    storage_cleanup_failed_keys: list[str]
+
+
 class ChatCreateRequest(BaseModel):
     course_id: str | None = None
     question: str = Field(min_length=1)

@@ -339,6 +339,7 @@ class DocumentRecord(Base):
     course_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     owner_ref: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
