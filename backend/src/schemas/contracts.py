@@ -3,16 +3,19 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-from src.schemas.retrieval import Citation
+from src.schemas.retrieval import Citation, GeneratedClaim
+
 
 class UpdateUserRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
     last_name: str = Field(min_length=1, max_length=128)
     email: EmailStr
 
+
 class AuthLoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+
 
 class AuthRegisterRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
@@ -67,6 +70,7 @@ class DocumentUploadRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     source_url: str | None = None
 
+
 class DocumentUploadResponse(BaseModel):
     document_id: str
     version_id: str
@@ -77,14 +81,17 @@ class DocumentUploadResponse(BaseModel):
     file_size_bytes: int
     status: str
 
+
 class ChatCreateRequest(BaseModel):
     course_id: str | None = None
     question: str = Field(min_length=1)
+
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"]
     content: str
     created_at: datetime
+
 
 class ChatThread(BaseModel):
     chat_id: str
@@ -94,7 +101,11 @@ class ChatThread(BaseModel):
     created_at: datetime
     updated_at: datetime
     messages: list[ChatMessage]
+    mode: Literal["general", "course"]
+    evidence_status: Literal["not_applicable", "sufficient", "conflicting", "insufficient"]
+    citations: list[Citation]
+    claims: list[GeneratedClaim]
+
 
 class ChatCreateResponse(ChatThread):
-    mode: Literal["general", "course"]
-    citations: list[Citation]
+    pass

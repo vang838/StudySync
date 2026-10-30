@@ -14,17 +14,155 @@ import { Button } from "@/components/ui/button";
 const MIN_WIDTH = 320;
 const DEFAULT_WIDTH = 420;
 
+type InternalCitation = {
+  source_type: "internal";
+  evidence_id: string | null;
+  claim_ids: string[];
+  document_id: string;
+  page_start: number | null;
+  page_end: number | null;
+  section_title: string | null;
+};
+
+type ExternalCitation = {
+  source_type: "external";
+  evidence_id: string | null;
+  claim_ids: string[];
+  provider: string;
+  title: string | null;
+  url: string;
+};
+
+type Citation = InternalCitation | ExternalCitation;
+
+type ClaimEvidenceAssociation = {
+  evidence_id: string;
+  relationship: "supports" | "contradicts" | "irrelevant";
+  confidence: number;
+};
+
+type GeneratedClaim = {
+  claim_id: string;
+  text: string;
+  evidence: ClaimEvidenceAssociation[];
+  has_agreement: boolean;
+  has_conflict: boolean;
+  is_insufficient: boolean;
+};
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   mode?: "general" | "course";
+  evidenceStatus?: "not_applicable" | "sufficient" | "conflicting" | "insufficient";
+  citations?: Citation[];
+  claims?: GeneratedClaim[];
 };
 
 type ChatResponse = {
   answer: string;
   mode: "general" | "course";
+  evidence_status: "not_applicable" | "sufficient" | "conflicting" | "insufficient";
+  citations: Citation[];
+  claims: GeneratedClaim[];
 };
+
+type SavedCourse = {
+  course_id: string;
+  title: string;
+};
+
+function internalCitationLabel(citation: InternalCitation) {
+  const location = citation.page_start
+    ? citation.page_end && citation.page_end !== citation.page_start
+      ? `pages ${citation.page_start}-${citation.page_end}`
+      : `page ${citation.page_start}`
+    : null;
+
+  return [citation.section_title, location, `document ${citation.document_id}`]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function CitationList({ citations, claim }: { citations: Citation[]; claim: GeneratedClaim }) {
+  const claimCitations = citations.filter((citation) =>
+    citation.claim_ids.includes(claim.claim_id)
+  );
+
+  if (claimCitations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 border-t border-border/60 pt-2 text-xs">
+      <div className="font-medium">Sources</div>
+      <ol className="mt-1 list-decimal space-y-1 pl-4 text-muted-foreground">
+        {claimCitations.map((citation, index) => {
+          const relationship = claim.evidence.find(
+            (association) => association.evidence_id === citation.evidence_id
+          )?.relationship;
+
+          return (
+            <li key={citation.evidence_id ?? `${citation.source_type}-${index}`}>
+              <span className={relationship === "contradicts" ? "font-medium text-amber-700 dark:text-amber-400" : "font-medium"}>
+                {relationship === "contradicts" ? "Conflicts" : "Supports"}
+              </span>
+              {" — "}
+              {citation.source_type === "external" ? (
+                <a
+                  href={citation.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {citation.title ?? citation.url}
+                </a>
+              ) : (
+                internalCitationLabel(citation)
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function AssistantMessageContent({ message }: { message: ChatMessage }) {
+  const claims = message.claims ?? [];
+  const hasUnresolvedClaim = claims.some((claim) => claim.is_insufficient);
+
+  if (claims.length === 0) {
+    return <div>{message.content}</div>;
+  }
+
+  if (hasUnresolvedClaim) {
+    return (
+      <>
+        <div>{message.content}</div>
+        {message.evidenceStatus === "conflicting" && claims.map((claim) => (
+          <div key={claim.claim_id} className="mt-3 border-t border-border/60 pt-2">
+            <div className="text-xs font-medium">Disputed claim</div>
+            <div className="mt-1">{claim.text}</div>
+            <CitationList citations={message.citations ?? []} claim={claim} />
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {claims.map((claim) => (
+        <div key={claim.claim_id}>
+          <div>{claim.text}</div>
+          <CitationList citations={message.citations ?? []} claim={claim} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AssistantWidget() {
   const pathname = usePathname();
@@ -36,8 +174,64 @@ export default function AssistantWidget() {
   const [resizing, setResizing] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(
+    courseId ?? ""
+  );
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+
+  useEffect(() => {
+    // Route navigation is external state and must reset a prior manual selection.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedCourseId(courseId ?? "");
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const controller = new AbortController();
+
+    async function fetchSavedCourses() {
+      try {
+        const userId = Number(localStorage.getItem("user_id"));
+
+        if (!Number.isInteger(userId) || userId < 1) {
+          throw new Error("Invalid user ID.");
+        }
+
+        const response = await fetch(
+          `/api/courses/saved?user_id=${userId}`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load saved courses.");
+        }
+
+        const data: SavedCourse[] = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid saved courses response.");
+        }
+
+        if (!controller.signal.aborted) {
+          setSavedCourses(data);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Unable to load saved courses.", error);
+        setSavedCourses([]);
+      }
+    }
+
+    void fetchSavedCourses();
+
+    return () => controller.abort();
+  }, [open]);
+
 
   useEffect(() => {
     const assistantWidth = open
@@ -91,9 +285,12 @@ export default function AssistantWidget() {
 
     const question = input.trim();
 
-    if (!question) {
+    if (!question || loading) {
       return;
     }
+
+    setError(null);
+    setLoading(true);
 
     setMessages((current) => [
       ...current,
@@ -114,7 +311,7 @@ export default function AssistantWidget() {
         },
         body: JSON.stringify({
           question,
-          ...(courseId ? { course_id: courseId } : {}),
+          ...(selectedCourseId ? { course_id: selectedCourseId } : {}),
         }),
       });
 
@@ -131,10 +328,16 @@ export default function AssistantWidget() {
           role: "assistant",
           content: data.answer,
           mode: data.mode,
+          evidenceStatus: data.evidence_status,
+          citations: data.citations,
+          claims: data.claims,
         },
       ]);
     } catch (error) {
       console.error("Unable to generate assistant response.", error);
+      setError("Failed to get a response. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -173,15 +376,29 @@ export default function AssistantWidget() {
           <div className="flex items-start justify-between border-b p-4">
             <div>
               <h2 className="font-semibold">StudySync AI</h2>
-              <p className="text-sm text-muted-foreground">
-                Context: {courseId ?? "General"}
-              </p>
+              <select
+                aria-label="Select course context"
+                value={selectedCourseId}
+                onChange={(event) => setSelectedCourseId(event.target.value)}
+                disabled={loading}
+                className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+              >
+                <option value="">General</option>
+                {courseId && !savedCourses.some((course) => course.course_id === courseId) && (
+                  <option value={courseId}>{courseId}</option>
+                )}
+                {savedCourses.map((course) => (
+                  <option key={course.course_id} value={course.course_id}>
+                    {course.title}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="s"
               onClick={() => setOpen(false)}
             >
               Close
@@ -202,9 +419,37 @@ export default function AssistantWidget() {
                       : "mr-auto bg-muted"
                     }`}
                 >
-                  {message.content}
+                  {message.evidenceStatus === "conflicting" && (
+                    <div className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                      Conflicting evidence detected
+                    </div>
+                  )}
+                  {message.evidenceStatus === "insufficient" && (
+                    <div className="mt-2 text-xs font-medium text-muted-foreground">
+                      Evidence was insufficient
+                    </div>
+                  )}
+                  <AssistantMessageContent message={message} />
                 </div>
               ))
+            )}
+
+            {loading && (
+              <div
+                role="status"
+                className="mr-auto max-w-[85%] rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"
+              >
+                Thinking...
+              </div>
+            )}
+
+            {error && (
+              <div
+                role="alert"
+                className="mr-auto max-w-[85%] rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {error}
+              </div>
             )}
           </div>
 
@@ -218,8 +463,8 @@ export default function AssistantWidget() {
                 className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none"
               />
 
-              <Button type="submit" disabled={!input.trim()}>
-                Send
+              <Button type="submit" disabled={!input.trim() || loading}>
+                {loading ? "Thinking..." : "Send"}
               </Button>
             </form>
           </div>

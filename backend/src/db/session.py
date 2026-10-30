@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.application.uwm_catalog_sync_service import sync_uwm_catalog_courses
 from src.core.config import settings
 from src.db.base import Base
+from src.db.chat_evidence_models import ChatEvidenceAssessmentRecord  # noqa: F401
 from src.db.models import ChatMessageRecord, ChatThreadRecord
 
 _engine: Engine | None = None
