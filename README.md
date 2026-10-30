@@ -144,6 +144,8 @@ Document uploads support Cloudflare R2 and local filesystem storage.
 - Use `OBJECT_STORAGE_PROVIDER=local` for fully local development.
 - Use `OBJECT_STORAGE_PROVIDER=r2` to store uploaded files in Cloudflare R2.
 
+- The following 2 options can be set in ...\StudySync\backend\.env
+
 ### Local filesystem storage (recommended for local testing)
 ```powershell
 cd backend
