@@ -39,7 +39,7 @@ export default function UploadDocumentsPage() {
         }
 
         if (!Number.isInteger(userId) || userId <= 0) {
-          throw new Error("Invalid user ID.");
+          throw new Error("Please sign in first.");
         }
 
         localStorage.setItem("user_id", String(userId));
