@@ -25,7 +25,7 @@ class FakeAssistantService:
         self.fail = False
         self.calls = []
 
-    def generate(self, *, question: str, course_id: str | None = None) -> AssistantResult:
+    def generate(self, *, question: str, course_id: str | None = None, hint_level: int | None = None) -> AssistantResult:
         if self.fail:
             raise LLMUnavailableError("Test connection failure")
 

@@ -213,3 +213,46 @@ class TestDocumentRetrievalService(TestCase):
 
         self.embedding_port.embed_query.assert_not_called()
         self.vector_store.search.assert_not_called()
+
+
+    def test_excludes_chunks_from_other_courses(self):
+        self.embedding_port.embed_query.return_value = [
+            0.1, 0.2, 0.3
+        ]
+
+        self.vector_store.search.return_value = [
+            VectorSearchResult(
+                record_id="chunk1",
+                score=0.95,
+                metadata={"course_id": "cs101"},
+            ),
+            VectorSearchResult(
+                record_id="chunk2",
+                score=0.90,
+                metadata={"course_id": "cs202"},
+            ),
+        ]
+
+        self.db.scalars.return_value = [
+            DocumentChunkRecord(
+                chunk_id="chunk1",
+                job_id="job1",
+                chunk_index=0,
+                text="CS101 material",
+            ),
+            DocumentChunkRecord(
+                chunk_id="chunk2",
+                job_id="job2",
+                chunk_index=0,
+                text="CS202 material",
+            ),
+        ]
+
+        results = self.service.retrieve(
+            query="Explain this concept",
+            course_id="cs101",
+        )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].chunk_id, "chunk1")
+        self.assertEqual(results[0].metadata["course_id"], "cs101")

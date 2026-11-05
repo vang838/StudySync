@@ -112,6 +112,7 @@ class DocumentDeleteResponse(BaseModel):
 class ChatCreateRequest(BaseModel):
     course_id: str | None = None
     question: str = Field(min_length=1)
+    hint_level: Literal[1, 2, 3, 4] | None = None
 
 
 class ChatMessage(BaseModel):

@@ -114,6 +114,15 @@ class DocumentRetrievalService:
             if chunk is None:
                 continue
 
+            if match.metadata.get("course_id") != course_id:
+                continue
+
+            if(
+                normalized_document_ids is not None
+                and match.metadata.get("document_id") not in normalized_document_ids
+            ):
+                continue
+
             results.append(
                 RetrievedChunk(chunk_id=chunk.chunk_id, text=chunk.text, score=match.score, metadata=match.metadata)
             )

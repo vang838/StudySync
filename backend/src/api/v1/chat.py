@@ -66,6 +66,7 @@ def create_chat(
         result = assistant_service.generate(
             question=payload.question,
             course_id=payload.course_id,
+            hint_level=payload.hint_level,
         )
     except LLMUnavailableError as exc:
         raise HTTPException(
