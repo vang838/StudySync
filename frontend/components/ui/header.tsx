@@ -28,15 +28,14 @@ export default function Header() {
     const [isHovered, setIsHovered] = useState(false);
     const [userId, setUserId] = useState<number | null>(null);
     useEffect(() => {
-        const storedUserId = localStorage.getItem("user_id");
-        const isAuthenticated = localStorage.getItem("auth_session") === "authenticated";
 
-        if (!storedUserId || !isAuthenticated) {
-            localStorage.removeItem("user_id");
+        const userId = localStorage.getItem("user_id");
+
+        if (!userId) {
             return;
         }
 
-        fetch(`/api/users/${encodeURIComponent(storedUserId)}`, {cache: "no-store"})
+        fetch(`/api/users/${encodeURIComponent(userId)}`)
             .then((res) => {
                 if (!res.ok) throw new Error("Could not load user");
                 return res.json();
@@ -53,7 +52,6 @@ export default function Header() {
     async function logout() {
         await fetch("/api/auth/logout", {method: "POST"});
         localStorage.removeItem("user_id");
-        localStorage.removeItem("auth_session");
         window.location.replace("/auth/signin");
     }
 
@@ -111,16 +109,9 @@ export default function Header() {
                                                 {userId !== null && <Link href={`/users/${userId}/ratings`}
                                                                           className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Your
                                                     Ratings</Link>}
-                                                {userId !== null ? (
-                                                    <button type="button" onClick={logout}
-                                                            className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Logout
-                                                    </button>
-                                                ) : (
-                                                    <Link href="/auth/signin"
-                                                          className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">
-                                                        Sign in
-                                                    </Link>
-                                                )}
+                                                <button type="button" onClick={logout}
+                                                        className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Logout
+                                                </button>
                                             </CardContent>
                                         </Card>
                                     </div>

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.api.dependencies import get_current_user, get_document_ingestion_service, get_object_storage, get_optional_current_user
+from src.api.dependencies import get_document_ingestion_service, get_object_storage
 from src.application.document_ingestion_service import DocumentIngestionService, DuplicateDocumentError
 from src.application.docs_upload import (
     DocumentTooLargeError,
@@ -12,7 +12,7 @@ from src.application.docs_upload import (
     EmptyDocumentError,
     UnsupportedDocumentTypeError,
 )
-from src.db.models import DocumentOwnerRecord, DocumentPublicationRecord, DocumentRecord, DocumentVersionRecord, User
+from src.db.models import DocumentRecord, DocumentVersionRecord
 from src.db.session import get_db
 from src.ports.object_storage import (
     ObjectNotFoundError,
@@ -20,7 +20,7 @@ from src.ports.object_storage import (
     ObjectStoragePort,
     ObjectStorageUnavailableError,
 )
-from src.schemas.contracts import DocumentDeleteResponse, DocumentListItemResponse, DocumentPublisherResponse, DocumentUploadResponse
+from src.schemas.contracts import DocumentDeleteResponse, DocumentListItemResponse, DocumentUploadResponse
 from src.schemas.contracts import DocumentPublishRequest, DocumentPublishResponse
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -31,7 +31,6 @@ def list_documents(
     course_id: str | None = Query(default=None, min_length=1),
     published_only: bool = Query(default=True),
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
 ) -> list[DocumentListItemResponse]:
     statement = (
         select(DocumentRecord, DocumentVersionRecord)
@@ -42,60 +41,19 @@ def list_documents(
     if course_id is not None:
         statement = statement.where(DocumentRecord.course_id == course_id)
     if published_only:
-        statement = statement.where(
-            (DocumentRecord.is_published.is_(True))
-            | select(DocumentPublicationRecord.id)
-            .where(DocumentPublicationRecord.document_id == DocumentRecord.document_id)
-            .exists()
-        )
-    elif current_user is not None:
-        statement = statement.join(
-            DocumentOwnerRecord,
-            DocumentOwnerRecord.document_id == DocumentRecord.document_id,
-        ).where(DocumentOwnerRecord.user_id == current_user.user_id)
-    else:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+        statement = statement.where(DocumentRecord.is_published.is_(True))
 
     rows = db.execute(statement).all()
-    def publisher_response(user_id: int) -> DocumentPublisherResponse:
-        user = db.get(User, user_id)
-        name = (
-            f"{user.user_first_name} {user.user_last_name}".strip()
-            if user is not None
-            else f"User {user_id}"
-        )
-        return DocumentPublisherResponse(
-            user_id=user_id,
-            name=name,
-            public_id=user.public_id if user is not None else None,
-        )
-
-    def publishers(document: DocumentRecord) -> list[DocumentPublisherResponse]:
-        publication_users = {publication.user_id for publication in document.publications}
-        if document.is_published and not publication_users:
-            try:
-                legacy_owner_id = int(document.owner_ref or "")
-            except ValueError:
-                legacy_owner_id = 0
-            if legacy_owner_id > 0:
-                publication_users.add(legacy_owner_id)
-        return [publisher_response(user_id) for user_id in publication_users]
-
     return [
         DocumentListItemResponse(
             document_id=document.document_id,
             version_id=version.version_id,
             course_id=document.course_id,
             title=document.title,
-            is_published=document.is_published or bool(document.publications),
+            is_published=document.is_published,
             original_filename=version.original_filename,
             file_size_bytes=version.file_size_bytes,
             created_at=version.created_at,
-            published_by=publishers(document),
-            is_published_by_current_user=(
-                current_user is not None
-                and any(publication.user_id == current_user.user_id for publication in document.publications)
-            ),
         )
         for document, version in rows
     ]
@@ -107,7 +65,6 @@ def upload_document(
     title: str = Form(..., min_length=1, max_length=200),
     file: UploadFile = File(...),
     service: DocumentIngestionService = Depends(get_document_ingestion_service),
-    current_user: User = Depends(get_current_user),
 ) -> DocumentUploadResponse:
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file must have a filename.")
@@ -119,7 +76,6 @@ def upload_document(
             filename=file.filename,
             declared_media_type=file.content_type,
             fileobj=file.file,
-            user_id=current_user.user_id,
         )
     except DocumentTooLargeError as exc:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)) from exc
@@ -156,7 +112,6 @@ def delete_document(
     document_id: str,
     db: Session = Depends(get_db),
     storage: ObjectStoragePort = Depends(get_object_storage),
-    current_user: User = Depends(get_current_user),
 ) -> DocumentDeleteResponse:
     document = db.get(DocumentRecord, document_id)
     if document is None:
@@ -164,21 +119,10 @@ def delete_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document was not found.",
         )
-    if not any(owner.user_id == current_user.user_id for owner in document.owners):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You may only remove your own document.")
 
-    has_other_owners = any(owner.user_id != current_user.user_id for owner in document.owners)
-    owner = next(owner for owner in document.owners if owner.user_id == current_user.user_id)
-    db.delete(owner)
-    publication = next(
-        (publication for publication in document.publications if publication.user_id == current_user.user_id),
-        None,
-    )
-    if publication is not None:
-        db.delete(publication)
-    object_keys = [version.object_key for version in document.versions] if not has_other_owners else []
-    if not has_other_owners:
-        db.delete(document)
+    object_keys = [version.object_key for version in document.versions]
+
+    db.delete(document)
     try:
         db.commit()
     except Exception as exc:
@@ -259,7 +203,6 @@ def set_document_publish_state(
     document_id: str,
     payload: DocumentPublishRequest = Body(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> DocumentPublishResponse:
     document = db.get(DocumentRecord, document_id)
     if document is None:
@@ -267,57 +210,12 @@ def set_document_publish_state(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document was not found.",
         )
-    owner = next((owner for owner in document.owners if owner.user_id == current_user.user_id), None)
-    if owner is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You may only publish your own document.")
-    publication = db.scalar(
-        select(DocumentPublicationRecord).where(
-            DocumentPublicationRecord.document_id == document_id,
-            DocumentPublicationRecord.user_id == current_user.user_id,
-        )
-    )
-    if payload.is_published and publication is None:
-        db.add(DocumentPublicationRecord(document_id=document_id, user_id=current_user.user_id))
-    elif not payload.is_published and publication is not None:
-        db.delete(publication)
-    db.commit()
 
-    published_by = [
-        DocumentPublisherResponse(
-            user_id=publication.user_id,
-            name=(
-                f"{publication.user.user_first_name} {publication.user.user_last_name}".strip()
-                if publication.user is not None
-                else f"User {publication.user_id}"
-            ),
-            public_id=publication.user.public_id if publication.user is not None else None,
-        )
-        for publication in document.publications
-    ]
-    if document.is_published and not published_by and document.owner_ref:
-        try:
-            owner_id = int(document.owner_ref)
-        except ValueError:
-            owner_id = 0
-        if owner_id > 0:
-            owner = db.get(User, owner_id)
-            published_by = [
-                DocumentPublisherResponse(
-                    user_id=owner_id,
-                    name=(
-                        f"{owner.user_first_name} {owner.user_last_name}".strip()
-                        if owner is not None
-                        else f"User {owner_id}"
-                    ),
-                    public_id=owner.public_id if owner is not None else None,
-                )
-            ]
+    document.is_published = payload.is_published
+    db.add(document)
+    db.commit()
 
     return DocumentPublishResponse(
         document_id=document_id,
-        is_published=document.is_published or bool(document.publications),
-        published_by=published_by,
-        is_published_by_current_user=any(
-            publication.user_id == current_user.user_id for publication in document.publications
-        ),
+        is_published=document.is_published,
     )

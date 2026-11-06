@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getPasswordRules, isStrongPassword } from "@/lib/passwordRules";
 
 type UserProfile = {
   user_id: number;
@@ -120,22 +119,16 @@ useEffect(() => {
             return;
         }
 
-        if (!isStrongPassword(password)) {
-            setError("Password does not meet all requirements.");
+        if (password.length < 8) {
+            setError("Password must be at least 8 characters.");
             return;
         }
 
         try {
-            const { userId } = await params;
-            const res = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
-                method: "PUT",
+            const res = await fetch(`/api/auth/resetpassword`, {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  first_name: firstName.trim(),
-                  last_name: lastName.trim(),
-                  email: email.trim(),
-                  password,
-                }),
+                body: JSON.stringify({ email, password }),
             });
 
             const data = await res.json();
@@ -146,7 +139,7 @@ useEffect(() => {
             }
 
             setError("");
-            setSaveSuccess(data.message || "Password updated successfully.");
+            setSaveSuccess(data.message || "Password reset successfully.");
         } catch {
             setError("Network error. Please try again.");
         }
@@ -257,13 +250,6 @@ useEffect(() => {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                         />
-                        <ul className="mt-2 space-y-1 text-xs">
-                            {getPasswordRules(password).map((rule) => (
-                                <li key={rule.label} className={rule.valid ? "text-green-700" : "text-red-600"}>
-                                    {rule.valid ? "✓" : "✕"} {rule.label}
-                                </li>
-                            ))}
-                        </ul>
                         </div>
                         <div className="w-full">
                         <label htmlFor="last-name" className="block text-xs font-medium tracking-wide text-muted-foreground">

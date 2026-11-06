@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
       method: "GET",
       headers: {
         accept: "application/json",
-        cookie: request.headers.get("cookie") ?? "",
       },
       signal: controller.signal,
       cache: "no-store",
@@ -76,9 +75,6 @@ export async function POST(request: NextRequest) {
     const response = await fetch(targetUrl.toString(), {
       method: "POST",
       body: uploadData,
-      headers: {
-        cookie: request.headers.get("cookie") ?? "",
-      },
       cache: "no-store",
     });
 

@@ -20,7 +20,6 @@ export async function GET(
       method: 'GET',
       headers: {
         accept: 'application/json',
-        cookie: request.headers.get('cookie') ?? '',
       },
       signal: controller.signal,
       cache: 'no-store',
@@ -60,7 +59,6 @@ export async function PUT(
       headers: {
         accept: 'application/json',
         'content-type': request.headers.get('content-type') ?? 'application/json',
-        cookie: request.headers.get('cookie') ?? '',
       },
       body,
       signal: controller.signal,
