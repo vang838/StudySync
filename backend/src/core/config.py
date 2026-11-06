@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     r2_access_key_id: str | None = Field(default=None, alias="R2_ACCESS_KEY_ID")
     r2_secret_access_key: str | None = Field(default=None, alias="R2_SECRET_ACCESS_KEY")
     r2_bucket_name: str | None = Field(default=None, alias="R2_BUCKET_NAME")
+    object_storage_provider: str = Field(default="r2", alias="OBJECT_STORAGE_PROVIDER")
+    local_object_storage_root: str = Field(default=".local-object-storage", alias="LOCAL_OBJECT_STORAGE_ROOT")
 
     document_max_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0, alias="DOCUMENT_MAX_UPLOAD_BYTES")
     document_chunk_max_words: int = Field(default=300, gt=0, alias="DOCUMENT_CHUNK_MAX_WORDS")

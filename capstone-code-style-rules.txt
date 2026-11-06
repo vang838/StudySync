@@ -1,0 +1,65 @@
+Capstone Project Coding & Response Rules
+
+1. Match the existing repository style
+- Preserve the formatting and organization already used in the surrounding file.
+- Do not reformat unrelated code when making a focused change.
+- Prefer minimal diffs that implement only the requested behavior.
+
+2. Use compact Python formatting
+- Keep function and method definitions on one line when the signature remains reasonably readable.
+- Avoid expanding short parameter lists across multiple lines just to follow an automatic formatter style.
+- Example preferred:
+  def __init__(self, retriever: LlamaIndexDocumentRetriever, llm: LLMPort) -> None:
+      self._retriever = retriever
+      self._llm = llm
+- Avoid this when the same signature fits clearly on one line:
+  def __init__(
+      self,
+      retriever: LlamaIndexDocumentRetriever,
+      llm: LLMPort,
+  ) -> None:
+      self._retriever = retriever
+      self._llm = llm
+
+3. Keep calls compact when readable
+- Keep short function and method calls on one line when doing so is still easy to read.
+- Do not introduce unnecessary vertical expansion for a small number of keyword arguments.
+- Follow the user's existing formatting when modifying an existing call.
+
+4. Use multiline formatting only when it improves readability
+- Break long expressions across lines when a single line becomes difficult to scan.
+- Prefer logical grouping rather than one argument or expression per line by default.
+- Long dictionaries, nested filters, or complex comprehensions may remain multiline.
+
+5. Preserve naming and architecture
+- Reuse the project's existing names, ports, adapters, services, schemas, and dependency boundaries.
+- Do not rename existing symbols merely for stylistic preference.
+- Keep LlamaIndex as an orchestration/retrieval layer rather than bypassing StudySync's existing ports and services.
+
+6. Make focused code changes
+- When asked to modify a method, show the changed method rather than rewriting the entire file unless the whole file is needed.
+- Explain exactly what changed and why.
+- Avoid adding abstractions, dependencies, or files unless they serve the current Sprint task.
+
+7. Testing and verification
+- Do not consider a task complete until the implementation is verified by the relevant tests or live integration check.
+- Prefer targeted tests first, then the full test suite when appropriate.
+- Preserve existing passing behavior while adding new coverage for new behavior.
+
+8. Commands and examples
+- Provide commands that can be copied directly into the StudySync development environment.
+- Do not include shell prompts such as `matthew@Matthew-PC:...$` in copyable commands.
+- Keep commands concise and avoid unnecessary alternatives unless they materially help troubleshooting.
+
+9. Follow established software engineering principles and industry design patterns
+- Coding decisions should follow, reference, or be justifiable by established software engineering principles and logical design used in real-world industry implementations.
+- Prefer designs that are maintainable, testable, modular, and consistent with common production practices.
+- Use principles such as separation of concerns, dependency inversion, single responsibility, clear interfaces, and appropriate abstraction where they fit the existing StudySync architecture.
+- Do not introduce a pattern only because it is common; it should solve a concrete problem in the current design.
+- When recommending a non-obvious architecture or implementation choice, briefly explain the engineering principle or industry rationale behind it.
+- Prefer consistency with the existing codebase when multiple industry-valid approaches are possible, unless there is a clear technical reason to change direction.
+
+10. Explanations
+- Keep implementation guidance direct and compact.
+- Prefer concrete edits, commands, and expected outputs over lengthy background explanation.
+- When a failure occurs, identify the exact cause before proposing broader changes.

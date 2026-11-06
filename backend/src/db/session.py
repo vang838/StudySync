@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.application.uwm_catalog_sync_service import sync_uwm_catalog_courses
 from src.core.config import settings
 from src.db.base import Base
+from src.db.chat_evidence_models import ChatEvidenceAssessmentRecord  # noqa: F401
 from src.db.models import ChatMessageRecord, ChatThreadRecord
 
 _engine: Engine | None = None
@@ -74,6 +75,12 @@ def init_db() -> None:
                     "ON professor_reviews (user_id, professor, course_id)"
                 )
             )
+
+    if "documents" in table_names:
+        column_names = {column["name"] for column in inspector.get_columns("documents")}
+        if "is_published" not in column_names:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE documents ADD COLUMN is_published BOOLEAN NOT NULL DEFAULT FALSE"))
 
     # 2. Seed initial data for the Course table
     SessionLocal = get_session_factory()

@@ -29,6 +29,29 @@ type SavedCourse = {
   is_archived?: boolean;
 };
 
+type UserDocument = {
+  document_id: string;
+  version_id: string;
+  course_id: string;
+  title: string;
+  is_published: boolean;
+  original_filename: string;
+  file_size_bytes: number;
+  created_at: string;
+};
+
+type DocumentDeleteResult = {
+  document_id: string;
+  deleted: boolean;
+  storage_cleanup_status: "complete" | "partial";
+  storage_cleanup_failed_keys: string[];
+};
+
+type DocumentPublishResult = {
+  document_id: string;
+  is_published: boolean;
+};
+
 type BookmarkedForumPost = {
   post_id: number;
   course_id: string;
@@ -46,6 +69,19 @@ const formatDateTime = (value: string): string => {
   return parsed.toLocaleString();
 };
 
+const formatFileSize = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return "Unknown size";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 export default function StudentProfilePage({
   params,
 }: {
@@ -53,12 +89,16 @@ export default function StudentProfilePage({
 }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+  const [documents, setDocuments] = useState<UserDocument[]>([]);
+  const [expandedCourseFolders, setExpandedCourseFolders] = useState<Record<string, boolean>>({});
   const [bookmarkedPosts, setBookmarkedPosts] = useState<BookmarkedForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
   const [activeUserId, setActiveUserId] = useState<number | null>(null);
   const [archivingCourseIds, setArchivingCourseIds] = useState<string[]>([]);
+  const [publishingDocumentIds, setPublishingDocumentIds] = useState<string[]>([]);
+  const [deletingDocumentIds, setDeletingDocumentIds] = useState<string[]>([]);
   const [showArchivedCourses, setShowArchivedCourses] = useState(false);
 
   const setCourseArchivedState = async (courseId: string, shouldArchive: boolean) => {
@@ -91,6 +131,90 @@ export default function StudentProfilePage({
     }
   };
 
+  const toggleCourseFolder = (courseId: string) => {
+    setExpandedCourseFolders((current) => ({
+      ...current,
+      [courseId]: !current[courseId],
+    }));
+  };
+
+  const setDocumentPublishState = async (documentId: string, isPublished: boolean) => {
+    if (publishingDocumentIds.includes(documentId)) {
+      return;
+    }
+    setPublishingDocumentIds((current) => [...current, documentId]);
+    try {
+      const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ is_published: isPublished }),
+      });
+      const body = (await response.json().catch(() => null)) as DocumentPublishResult | { detail?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(
+          body && "detail" in body && typeof body.detail === "string"
+            ? body.detail
+            : `Failed to update publish state (HTTP ${response.status})`,
+        );
+      }
+
+      setDocuments((current) =>
+        current.map((document) => (
+          document.document_id === documentId
+            ? { ...document, is_published: isPublished }
+            : document
+        )),
+      );
+    } catch (publishError) {
+      const message = publishError instanceof Error ? publishError.message : "Unable to update publish state.";
+      setError(message);
+    } finally {
+      setPublishingDocumentIds((current) => current.filter((id) => id !== documentId));
+    }
+  };
+
+  const deleteDocument = async (documentId: string) => {
+    if (deletingDocumentIds.includes(documentId)) {
+      return;
+    }
+    setDeletingDocumentIds((current) => [...current, documentId]);
+    try {
+      const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}`, {
+        method: "DELETE",
+      });
+      const body = (await response.json().catch(() => null)) as DocumentDeleteResult | { detail?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(
+          body && "detail" in body && typeof body.detail === "string"
+            ? body.detail
+            : `Failed to delete document (HTTP ${response.status})`,
+        );
+      }
+
+      if (
+        body
+        && "storage_cleanup_status" in body
+        && body.storage_cleanup_status === "partial"
+        && Array.isArray(body.storage_cleanup_failed_keys)
+      ) {
+        setError(
+          `Document removed from StudySync, but ${body.storage_cleanup_failed_keys.length} storage object(s) could not be deleted.`,
+        );
+      }
+
+      setDocuments((current) => current.filter((document) => document.document_id !== documentId));
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : "Unable to delete document.";
+      setError(message);
+    } finally {
+      setDeletingDocumentIds((current) => current.filter((id) => id !== documentId));
+    }
+  };
+
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;
@@ -99,9 +223,10 @@ export default function StudentProfilePage({
       setError(null);
 
       try {
-        const [userResponse, coursesResponse] = await Promise.all([
+        const [userResponse, coursesResponse, documentsResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
           fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}&include_archived=true`),
+          fetch("/api/documents?published_only=false"),
         ]);
 
         if (!userResponse.ok) {
@@ -113,12 +238,18 @@ export default function StudentProfilePage({
           const body = await coursesResponse.json().catch(() => ({}));
           throw new Error(body?.detail ?? `Failed to load saved courses (HTTP ${coursesResponse.status})`);
         }
+        if (!documentsResponse.ok) {
+          const body = await documentsResponse.json().catch(() => ({}));
+          throw new Error(body?.detail ?? `Failed to load documents (HTTP ${documentsResponse.status})`);
+        }
 
         const userData = (await userResponse.json()) as UserProfile;
         const courseData = (await coursesResponse.json()) as SavedCourse[];
+        const documentData = (await documentsResponse.json()) as UserDocument[];
         const normalizedCourseData = Array.isArray(courseData)
           ? courseData.map((course) => ({ ...course, is_archived: Boolean(course.is_archived) }))
           : [];
+        const normalizedDocumentData = Array.isArray(documentData) ? documentData : [];
         const activeCourses = normalizedCourseData.filter((course) => !course.is_archived);
         const bookmarkResponses = await Promise.all(
           activeCourses.map((course) =>
@@ -154,6 +285,10 @@ export default function StudentProfilePage({
         setUser(userData);
         setActiveUserId(userData.user_id);
         setSavedCourses(normalizedCourseData);
+        setDocuments(normalizedDocumentData);
+        setExpandedCourseFolders(
+          Object.fromEntries(normalizedCourseData.map((course) => [course.course_id, false])),
+        );
         setBookmarkedPosts(flattenedBookmarkedPosts);
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : "Unable to load profile.";
@@ -181,6 +316,29 @@ export default function StudentProfilePage({
   const displayedSavedCourses = useMemo(
     () => (effectiveShowArchivedCourses ? archivedSavedCourses : activeSavedCourses),
     [activeSavedCourses, archivedSavedCourses, effectiveShowArchivedCourses],
+  );
+  const documentMapByCourse = useMemo(() => {
+    const lookup = new Map<string, UserDocument[]>();
+    const visibleCourseIds = new Set(savedCourses.map((course) => course.course_id));
+    for (const document of documents) {
+      if (!visibleCourseIds.has(document.course_id)) {
+        continue;
+      }
+      const current = lookup.get(document.course_id);
+      if (current) {
+        current.push(document);
+      } else {
+        lookup.set(document.course_id, [document]);
+      }
+    }
+    for (const values of lookup.values()) {
+      values.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    }
+    return lookup;
+  }, [documents, savedCourses]);
+  const visibleDocumentCount = useMemo(
+    () => savedCourses.reduce((total, course) => total + (documentMapByCourse.get(course.course_id)?.length ?? 0), 0),
+    [documentMapByCourse, savedCourses],
   );
 
   if (loading) {
@@ -268,16 +426,21 @@ export default function StudentProfilePage({
                       <p className="text-xs font-medium tracking-wide text-muted-foreground">
                         {effectiveShowArchivedCourses ? "Archived" : "Active"}
                       </p>
-                      <Button
-                        type="button"
-                        size="s"
-                        variant="outline"
-                        onClick={() => setShowArchivedCourses((current) => !current)}
-                      >
-                        {effectiveShowArchivedCourses
-                          ? `Show Active (${activeSavedCourses.length})`
-                          : `Show Archived (${archivedSavedCourses.length})`}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {visibleDocumentCount} upload{visibleDocumentCount === 1 ? "" : "s"}
+                        </p>
+                        <Button
+                          type="button"
+                          size="s"
+                          variant="outline"
+                          onClick={() => setShowArchivedCourses((current) => !current)}
+                        >
+                          {effectiveShowArchivedCourses
+                            ? `Show Active (${activeSavedCourses.length})`
+                            : `Show Archived (${archivedSavedCourses.length})`}
+                        </Button>
+                      </div>
                     </div>
                     {displayedSavedCourses.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
@@ -286,29 +449,111 @@ export default function StudentProfilePage({
                     ) : displayedSavedCourses.map((course) => (
                       <div
                         key={course.course_id}
-                        className={`flex items-center justify-between gap-3 rounded-md border border-border/60 p-3 ${
+                        className={`rounded-md border border-border/60 ${
                           effectiveShowArchivedCourses ? "bg-card/70" : "bg-card"
                         }`}
                       >
-                        <Link href={`/courses/${encodeURIComponent(course.course_id)}`} className="min-w-0 flex-1">
-                          <div className="transition hover:opacity-90">
-                            <p className="truncate text-sm font-medium text-foreground">{course.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {course.course_id} · {course.subject} · {course.year}
-                            </p>
+                        <div className="flex items-center justify-between gap-3 p-3">
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleCourseFolder(course.course_id)}
+                              className="shrink-0 text-3xl font-black leading-none text-foreground transition hover:opacity-80"
+                              aria-label={Boolean(expandedCourseFolders[course.course_id]) ? "Collapse course folder" : "Expand course folder"}
+                              aria-expanded={Boolean(expandedCourseFolders[course.course_id])}
+                            >
+                              {Boolean(expandedCourseFolders[course.course_id]) ? "▾" : "▸"}
+                            </button>
+                            <Link
+                              href={`/courses/${encodeURIComponent(course.course_id)}`}
+                              className="min-w-0 flex-1 text-left transition hover:opacity-90"
+                            >
+                              <p className="truncate text-sm font-medium text-foreground">{course.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {course.course_id} · {course.subject} · {course.year}
+                              </p>
+                            </Link>
                           </div>
-                        </Link>
-                        <Button
-                          type="button"
-                          size="s"
-                          variant={effectiveShowArchivedCourses ? "secondary" : "outline"}
-                          disabled={archivingCourseIds.includes(course.course_id)}
-                          onClick={() => {
-                            void setCourseArchivedState(course.course_id, !effectiveShowArchivedCourses);
-                          }}
-                        >
-                          {effectiveShowArchivedCourses ? "Restore" : "Archive"}
-                        </Button>
+                          <Button
+                            type="button"
+                            size="s"
+                            variant={effectiveShowArchivedCourses ? "secondary" : "outline"}
+                            disabled={archivingCourseIds.includes(course.course_id)}
+                            onClick={() => {
+                              void setCourseArchivedState(course.course_id, !effectiveShowArchivedCourses);
+                            }}
+                          >
+                            {effectiveShowArchivedCourses ? "Restore" : "Archive"}
+                          </Button>
+                        </div>
+                        {Boolean(expandedCourseFolders[course.course_id]) && (
+                          <div className="border-t border-border/60 p-3">
+                            {(documentMapByCourse.get(course.course_id) ?? []).length === 0 ? (
+                              <div className="flex flex-wrap items-center gap-3">
+                                <p className="text-sm text-muted-foreground">No uploads in this class yet.</p>
+                                <Link
+                                  href={`/users/${encodeURIComponent(String(activeUserId ?? user.user_id))}/uploads`}
+                                  className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+                                >
+                                  Upload document
+                                </Link>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {(documentMapByCourse.get(course.course_id) ?? []).map((document) => (
+                                  <div
+                                    key={document.document_id}
+                                    className="rounded-md border border-border/60 bg-card p-3"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium text-foreground">{document.title}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                          {document.original_filename} · {formatFileSize(document.file_size_bytes)} · {formatDateTime(document.created_at)}
+                                        </p>
+                                      </div>
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                          document.is_published
+                                            ? "bg-emerald-100 text-emerald-700"
+                                            : "bg-muted text-muted-foreground"
+                                        }`}
+                                      >
+                                        {document.is_published ? "Published" : "Private"}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          void setDocumentPublishState(document.document_id, !document.is_published);
+                                        }}
+                                        disabled={publishingDocumentIds.includes(document.document_id)}
+                                        className="text-xs font-medium text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
+                                      >
+                                        {publishingDocumentIds.includes(document.document_id)
+                                          ? "Updating..."
+                                          : document.is_published
+                                            ? "Make private"
+                                            : "Publish to class"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          void deleteDocument(document.document_id);
+                                        }}
+                                        disabled={deletingDocumentIds.includes(document.document_id)}
+                                        className="text-xs font-medium text-destructive underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
+                                      >
+                                        {deletingDocumentIds.includes(document.document_id) ? "Removing..." : "Remove"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

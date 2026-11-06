@@ -7,6 +7,7 @@ from src.core.config import settings
 from src.adapters.llm.ollama import OllamaAdapter
 from src.adapters.embedding.ollama import OllamaEmbeddingAdapter
 
+from src.adapters.storage.local import LocalObjectStorageAdapter
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
 
 from src.application.rag_service import RAGService
@@ -64,6 +65,14 @@ def get_embedding_port() -> Generator[EmbeddingPort, None, None]:
         )
 
 def get_object_storage() -> ObjectStoragePort:
+    provider = settings.object_storage_provider.strip().lower()
+
+    if provider == "local":
+        return LocalObjectStorageAdapter(root_path=settings.local_object_storage_root)
+
+    if provider != "r2":
+        raise RuntimeError(f"Unsupported object storage provider: {settings.object_storage_provider}")
+
     if not settings.r2_endpoint_url:
         raise RuntimeError("R2_ENDPOINT_URL is not configured.")
 

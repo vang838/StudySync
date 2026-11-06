@@ -1,7 +1,7 @@
-// frontend/app/courses/[courseId]/page.tsx
-import { Metadata } from "next";
-import CourseOverview from "@/components/course-overview/CourseOverview";
+import { redirect } from "next/navigation";
 
+export default function LegacyCourseRoute() {
+  redirect("/courses/course_search");
 // Generate static metadata for the page. You might need to adjust this
 // based on how you fetch course data.
 export const metadata: Metadata = {
@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   description: "Central hub for all materials, discussions, and information related to a specific course.",
 };
 
-export default function CourseDetailPage({ params }: { params: { courseId: string } }) {
-  const courseId = params.courseId;
+export default async function CourseDetailPage({ params }: { params: Promise<{ courseId?: string }> }) {
+  const { courseId } = await params;
 
   // In a real application, you would fetch the course data here:
   // const { courseInfo, professor, materials, forumPosts } = await getCourseData(courseId);

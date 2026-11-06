@@ -2,9 +2,17 @@
 
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 export default function ResetPassword() {
+    return (
+        <Suspense fallback={<main><p role="status">Loading reset form...</p></main>}>
+            <ResetPasswordForm />
+        </Suspense>
+    );
+}
+
+function ResetPasswordForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const email = searchParams.get("email") ?? "";

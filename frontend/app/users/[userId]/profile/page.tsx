@@ -30,6 +30,17 @@ type SavedCourse = {
   is_archived?: boolean;
 };
 
+type UserDocument = {
+  document_id: string;
+  version_id: string;
+  course_id: string;
+  title: string;
+  is_published: boolean;
+  original_filename: string;
+  file_size_bytes: number;
+  created_at: string;
+};
+
 type BookmarkedForumPost = {
   post_id: number;
   course_id: string;
@@ -67,6 +78,19 @@ const formatDateTime = (value: string): string => {
     return value;
   }
   return parsed.toLocaleString();
+};
+
+const formatFileSize = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return "Unknown size";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const getPaginationItems = (page: number, totalPages: number): Array<number | "ellipsis"> => {
@@ -136,6 +160,8 @@ export default function UserProfilePage({
 }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+  const [documents, setDocuments] = useState<UserDocument[]>([]);
+  const [expandedCourseFolders, setExpandedCourseFolders] = useState<Record<string, boolean>>({});
   const [bookmarkedPosts, setBookmarkedPosts] = useState<BookmarkedForumPost[]>([]);
   const [discussionActivityPosts, setDiscussionActivityPosts] = useState<UserDiscussionActivityPost[]>([]);
   const [bookmarkedPage, setBookmarkedPage] = useState(1);
@@ -179,6 +205,13 @@ export default function UserProfilePage({
     }
   };
 
+  const toggleCourseFolder = (courseId: string) => {
+    setExpandedCourseFolders((current) => ({
+      ...current,
+      [courseId]: !current[courseId],
+    }));
+  };
+
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;
@@ -187,9 +220,10 @@ export default function UserProfilePage({
       setError(null);
 
       try {
-        const [userResponse, coursesResponse] = await Promise.all([
+        const [userResponse, coursesResponse, documentsResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
           fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}&include_archived=true`),
+          fetch("/api/documents?published_only=true"),
         ]);
 
         if (!userResponse.ok) {
@@ -202,11 +236,18 @@ export default function UserProfilePage({
           throw new Error(body?.detail ?? `Failed to load saved courses (HTTP ${coursesResponse.status})`);
         }
 
+        if (!documentsResponse.ok) {
+          const body = await documentsResponse.json().catch(() => ({}));
+          throw new Error(body?.detail ?? `Failed to load documents (HTTP ${documentsResponse.status})`);
+        }
+
         const userData = (await userResponse.json()) as UserProfile;
         const courseData = (await coursesResponse.json()) as SavedCourse[];
+        const documentData = (await documentsResponse.json()) as UserDocument[];
         const normalizedCourseData = Array.isArray(courseData)
           ? courseData.map((course) => ({ ...course, is_archived: Boolean(course.is_archived) }))
           : [];
+        const normalizedDocumentData = Array.isArray(documentData) ? documentData : [];
         const parsedUserId = Number(userId);
         const resolvedNumericUserId = Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : userData.user_id;
         const activeCourses = normalizedCourseData.filter((course) => !course.is_archived);
@@ -271,6 +312,10 @@ export default function UserProfilePage({
         setUser(userData);
         setActiveUserId(resolvedNumericUserId);
         setSavedCourses(normalizedCourseData);
+        setDocuments(normalizedDocumentData);
+        setExpandedCourseFolders(
+          Object.fromEntries(normalizedCourseData.map((course) => [course.course_id, false])),
+        );
         setBookmarkedPosts(flattenedBookmarkedPosts);
         setDiscussionActivityPosts(discussionActivity);
         setBookmarkedPage(1);
@@ -301,6 +346,33 @@ export default function UserProfilePage({
   const displayedSavedCourses = useMemo(
     () => (effectiveShowArchivedCourses ? archivedSavedCourses : activeSavedCourses),
     [activeSavedCourses, archivedSavedCourses, effectiveShowArchivedCourses],
+  );
+  const documentMapByCourse = useMemo(() => {
+    const lookup = new Map<string, UserDocument[]>();
+    const visibleCourseIds = new Set(savedCourses.map((course) => course.course_id));
+
+    for (const document of documents) {
+      if (!visibleCourseIds.has(document.course_id)) {
+        continue;
+      }
+
+      const current = lookup.get(document.course_id);
+      if (current) {
+        current.push(document);
+      } else {
+        lookup.set(document.course_id, [document]);
+      }
+    }
+
+    for (const value of lookup.values()) {
+      value.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    }
+
+    return lookup;
+  }, [documents, savedCourses]);
+  const visibleDocumentCount = useMemo(
+    () => savedCourses.reduce((total, course) => total + (documentMapByCourse.get(course.course_id)?.length ?? 0), 0),
+    [documentMapByCourse, savedCourses],
   );
   const filteredBookmarkedPosts = useMemo(() => {
     const normalizedQuery = bookmarkedSearchQuery.trim().toLowerCase();
@@ -353,7 +425,7 @@ export default function UserProfilePage({
     return <p className="text-sm text-muted-foreground">Loading profile...</p>;
   }
 
-  if (error) {
+  if (error && !user) {
     return <p className="text-sm font-medium text-destructive">{error}</p>;
   }
 
@@ -380,6 +452,12 @@ export default function UserProfilePage({
             </Link>
           </div>
         </header>
+
+        {error && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <Separator />
 
@@ -425,16 +503,21 @@ export default function UserProfilePage({
                       <p className="text-xs font-medium tracking-wide text-muted-foreground">
                         {effectiveShowArchivedCourses ? "Archived" : "Active"}
                       </p>
-                      <Button
-                        type="button"
-                        size="s"
-                        variant="outline"
-                        onClick={() => setShowArchivedCourses((current) => !current)}
-                      >
-                        {effectiveShowArchivedCourses
-                          ? `Show Active (${activeSavedCourses.length})`
-                          : `Show Archived (${archivedSavedCourses.length})`}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {visibleDocumentCount} published file{visibleDocumentCount === 1 ? "" : "s"}
+                        </p>
+                        <Button
+                          type="button"
+                          size="s"
+                          variant="outline"
+                          onClick={() => setShowArchivedCourses((current) => !current)}
+                        >
+                          {effectiveShowArchivedCourses
+                            ? `Show Active (${activeSavedCourses.length})`
+                            : `Show Archived (${archivedSavedCourses.length})`}
+                        </Button>
+                      </div>
                     </div>
                     {displayedSavedCourses.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
@@ -443,29 +526,57 @@ export default function UserProfilePage({
                     ) : displayedSavedCourses.map((course) => (
                       <div
                         key={course.course_id}
-                        className={`flex items-center justify-between gap-3 rounded-md border border-border/60 p-3 ${
+                        className={`rounded-md border border-border/60 ${
                           effectiveShowArchivedCourses ? "bg-card/70" : "bg-card"
                         }`}
                       >
-                        <Link href={`/courses/${encodeURIComponent(course.course_id)}`} className="min-w-0 flex-1">
-                          <div className="transition hover:opacity-90">
-                            <p className="truncate text-sm font-medium text-foreground">{course.title}</p>
+                        <div className="flex items-center justify-between gap-3 p-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleCourseFolder(course.course_id)}
+                            className="min-w-0 flex-1 text-left transition hover:opacity-90"
+                          >
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {Boolean(expandedCourseFolders[course.course_id]) ? "▾" : "▸"} {course.title}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               {course.course_id} · {course.subject} · {course.year}
                             </p>
+                          </button>
+                          <Button
+                            type="button"
+                            size="s"
+                            variant={effectiveShowArchivedCourses ? "secondary" : "outline"}
+                            disabled={archivingCourseIds.includes(course.course_id)}
+                            onClick={() => {
+                              void setCourseArchivedState(course.course_id, !effectiveShowArchivedCourses);
+                            }}
+                          >
+                            {effectiveShowArchivedCourses ? "Restore" : "Archive"}
+                          </Button>
+                        </div>
+                        {Boolean(expandedCourseFolders[course.course_id]) && (
+                          <div className="border-t border-border/60 p-3">
+                            {(documentMapByCourse.get(course.course_id) ?? []).length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No published uploads in this class yet.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {(documentMapByCourse.get(course.course_id) ?? []).map((document) => (
+                                  <Link
+                                    key={document.document_id}
+                                    href={`/courses/${encodeURIComponent(course.course_id)}`}
+                                    className="block rounded-md border border-border/60 bg-card p-3 transition hover:border-secondary hover:shadow-sm"
+                                  >
+                                    <p className="truncate text-sm font-medium text-foreground">{document.title}</p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {document.original_filename} · {formatFileSize(document.file_size_bytes)} · {formatDateTime(document.created_at)}
+                                    </p>
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </Link>
-                        <Button
-                          type="button"
-                          size="s"
-                          variant={effectiveShowArchivedCourses ? "secondary" : "outline"}
-                          disabled={archivingCourseIds.includes(course.course_id)}
-                          onClick={() => {
-                            void setCourseArchivedState(course.course_id, !effectiveShowArchivedCourses);
-                          }}
-                        >
-                          {effectiveShowArchivedCourses ? "Restore" : "Archive"}
-                        </Button>
+                        )}
                       </div>
                     ))}
                   </div>

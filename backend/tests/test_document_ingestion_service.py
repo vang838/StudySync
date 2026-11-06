@@ -78,6 +78,7 @@ class TestDocumentIngestionService(TestCase):
         self.assertIsInstance(records[1], DocumentVersionRecord)
         self.assertIsInstance(records[2], IngestionJobRecord)
 
+        self.assertFalse(records[0].is_published)
         self.assertEqual(records[1].file_hash, "a" * 64)
         self.assertEqual(records[2].status, "queued")
         self.assertEqual(records[2].current_stage, "uploaded")

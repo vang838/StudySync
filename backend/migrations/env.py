@@ -7,6 +7,7 @@ from alembic import context
 
 from src.core.config import settings
 from src.db.base import Base
+from src.db import chat_evidence_models  # noqa: F401
 from src.db import models  # noqa: F401
 
 # this is the Alembic Config object, which provides

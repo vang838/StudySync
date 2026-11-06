@@ -3,16 +3,19 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field, StringConstraints
 
-from src.schemas.retrieval import Citation
+from src.schemas.retrieval import Citation, GeneratedClaim
+
 
 class UpdateUserRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
     last_name: str = Field(min_length=1, max_length=128)
     email: EmailStr
 
+
 class AuthLoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+
 
 class AuthRegisterRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
@@ -67,6 +70,7 @@ class DocumentUploadRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     source_url: str | None = None
 
+
 class DocumentUploadResponse(BaseModel):
     document_id: str
     version_id: str
@@ -77,14 +81,45 @@ class DocumentUploadResponse(BaseModel):
     file_size_bytes: int
     status: str
 
+
+class DocumentListItemResponse(BaseModel):
+    document_id: str
+    version_id: str
+    course_id: str
+    title: str
+    is_published: bool
+    original_filename: str
+    file_size_bytes: int
+    created_at: datetime
+
+
+class DocumentPublishRequest(BaseModel):
+    is_published: bool
+
+
+class DocumentPublishResponse(BaseModel):
+    document_id: str
+    is_published: bool
+
+
+class DocumentDeleteResponse(BaseModel):
+    document_id: str
+    deleted: bool
+    storage_cleanup_status: Literal["complete", "partial"]
+    storage_cleanup_failed_keys: list[str]
+
+
 class ChatCreateRequest(BaseModel):
     course_id: str | None = None
     question: str = Field(min_length=1)
+    hint_level: Literal[1, 2, 3, 4] | None = None
+
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"]
     content: str
     created_at: datetime
+
 
 class ChatThread(BaseModel):
     chat_id: str
@@ -94,20 +129,18 @@ class ChatThread(BaseModel):
     created_at: datetime
     updated_at: datetime
     messages: list[ChatMessage]
-
-class ChatCreateResponse(ChatThread):
     mode: Literal["general", "course"]
+    evidence_status: Literal["not_applicable", "sufficient", "conflicting", "insufficient"]
     citations: list[Citation]
-
-NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    claims: list[GeneratedClaim]
 
 class CardInput(BaseModel):
     flashcard_id: int | None = Field(default=None, gt=0)
-    question: NonEmptyText
-    answer: NonEmptyText
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 class SetInput(BaseModel):
-    course_id: NonEmptyText
+    course_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     description: str | None = None
     cards: list[CardInput] = Field(min_length=1)
@@ -131,3 +164,6 @@ class SetOut(BaseModel):
 
 class RatingInput(BaseModel):
     rating: Literal["easy", "practice", "hard"]
+
+class ChatCreateResponse(ChatThread):
+    pass
