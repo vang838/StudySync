@@ -1,5 +1,4 @@
 from collections.abc import Generator
-from uuid import uuid4
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
@@ -82,67 +81,6 @@ def init_db() -> None:
         if "is_published" not in column_names:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE documents ADD COLUMN is_published BOOLEAN NOT NULL DEFAULT FALSE"))
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "INSERT INTO document_owners (document_id, user_id) "
-                    "SELECT document_id, CAST(owner_ref AS INTEGER) FROM documents "
-                    "WHERE owner_ref IS NOT NULL AND owner_ref <> '' "
-                    "AND CAST(owner_ref AS INTEGER) > 0 "
-                    "AND NOT EXISTS (SELECT 1 FROM document_owners o "
-                    "WHERE o.document_id = documents.document_id)"
-                )
-            )
-            conn.execute(
-                text(
-                    "UPDATE documents SET owner_ref = '2' "
-                    "WHERE owner_ref IS NULL "
-                    "AND EXISTS (SELECT 1 FROM users WHERE user_id = 2)"
-                )
-            )
-            conn.execute(
-                text(
-                    "INSERT INTO document_owners (document_id, user_id) "
-                    "SELECT document_id, 2 FROM documents "
-                    "WHERE owner_ref = '2' "
-                    "AND NOT EXISTS (SELECT 1 FROM document_owners o "
-                    "WHERE o.document_id = documents.document_id AND o.user_id = 2)"
-                )
-            )
-            conn.execute(
-                text(
-                    "INSERT INTO document_publications (document_id, user_id) "
-                    "SELECT document_id, 2 FROM documents "
-                    "WHERE is_published = TRUE AND owner_ref = '2' "
-                    "AND NOT EXISTS (SELECT 1 FROM document_publications p "
-                    "WHERE p.document_id = documents.document_id AND p.user_id = 2)"
-                )
-            )
-            conn.execute(
-                text(
-                    "INSERT INTO document_publications (document_id, user_id) "
-                    "SELECT document_id, CAST(owner_ref AS INTEGER) FROM documents "
-                    "WHERE is_published = TRUE AND owner_ref IS NOT NULL "
-                    "AND CAST(owner_ref AS INTEGER) > 0 "
-                    "AND NOT EXISTS (SELECT 1 FROM document_publications p "
-                    "WHERE p.document_id = documents.document_id)"
-                )
-            )
-
-    if "users" in table_names:
-        column_names = {column["name"] for column in inspector.get_columns("users")}
-        if "public_id" not in column_names:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE users ADD COLUMN public_id VARCHAR(36)"))
-                rows = conn.execute(text("SELECT user_id FROM users WHERE public_id IS NULL")).fetchall()
-                for (user_id,) in rows:
-                    conn.execute(
-                        text("UPDATE users SET public_id = :public_id WHERE user_id = :user_id"),
-                        {"public_id": str(uuid4()), "user_id": user_id},
-                    )
-        if "password_needs_update" not in column_names:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE users ADD COLUMN password_needs_update BOOLEAN NOT NULL DEFAULT TRUE"))
 
     # 2. Seed initial data for the Course table
     SessionLocal = get_session_factory()

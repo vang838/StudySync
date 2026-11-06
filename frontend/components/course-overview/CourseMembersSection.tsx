@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 
 type CourseMember = {
   user_id: number;
-  public_id: string;
   first_name: string;
   last_name: string;
   full_name: string;
@@ -23,23 +22,6 @@ export default function CourseMembersSection({ courseId }: CourseMembersSectionP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentUser, setCurrentUser] = useState<{userId: number; publicId: string} | null>(null);
-
-  useEffect(() => {
-    const storedUserId = localStorage.getItem("user_id");
-    if (storedUserId && localStorage.getItem("auth_session") === "authenticated") {
-      fetch(`/api/users/${encodeURIComponent(storedUserId)}`, {cache: "no-store"})
-        .then((response) => response.ok ? response.json() as Promise<{user_id: number; public_id: string}> : null)
-        .then((user) => {
-          if (user) {
-            setCurrentUser({userId: user.user_id, publicId: user.public_id});
-          }
-        })
-        .catch(() => {
-          setCurrentUser(null);
-        });
-    }
-  }, []);
 
   useEffect(() => {
     const loadMembers = async () => {
@@ -103,15 +85,7 @@ export default function CourseMembersSection({ courseId }: CourseMembersSectionP
         {!loading && !error && filteredMembers.length > 0 && (
           <div className="space-y-3">
             {filteredMembers.map((member) => (
-              <Link
-                key={member.user_id}
-                href={
-                  currentUser?.publicId === member.public_id
-                    ? `/users/${currentUser.userId}/student_profile`
-                    : `/users/${member.public_id ?? member.user_id}/profile`
-                }
-                className="block"
-              >
+              <Link key={member.user_id} href={`/users/${member.user_id}/student_profile`} className="block">
                 <div className="rounded-md border border-border/60 bg-card p-3 transition hover:border-secondary hover:shadow-sm">
                   <div className="flex items-start gap-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-sm font-semibold text-secondary">

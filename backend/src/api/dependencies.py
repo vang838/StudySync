@@ -27,10 +27,8 @@ from src.db.session import get_db
 from src.ports.object_storage import ObjectStoragePort
 from src.ports.embedding import EmbeddingPort
 
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Depends
 from sqlalchemy.orm import Session
-from src.core.security import get_session_user_id
-from src.db.models import User
 
 from pinecone import Pinecone
 
@@ -45,28 +43,6 @@ from src.ports.llm import LLMPort
 
 import httpx
 from src.adapters.external_retrieval.searxng import SearXNGExternalRetrievalAdapter
-
-
-def get_current_user(
-    studysync_session: str | None = Cookie(default=None),
-    db: Session = Depends(get_db),
-) -> User:
-    user_id = get_session_user_id(studysync_session)
-    user = db.get(User, user_id) if user_id is not None else None
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required.",
-        )
-    return user
-
-
-def get_optional_current_user(
-    studysync_session: str | None = Cookie(default=None),
-    db: Session = Depends(get_db),
-) -> User | None:
-    user_id = get_session_user_id(studysync_session)
-    return db.get(User, user_id) if user_id is not None else None
 from src.application.evidence_ranking_service import EvidenceRankingService
 from src.application.evidence_retrieval_service import EvidenceRetrievalService
 from src.application.evidence_service import EvidenceService

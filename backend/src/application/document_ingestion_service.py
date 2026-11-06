@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.application.docs_upload import DocumentUploadInspector
-from src.db.models import DocumentOwnerRecord, DocumentRecord, DocumentVersionRecord, IngestionJobRecord
+from src.db.models import DocumentRecord, DocumentVersionRecord, IngestionJobRecord
 from src.ports.object_storage import ObjectStoragePort
 
 
@@ -32,7 +32,7 @@ class DocumentIngestionService:
         self._storage = storage
         self._inspector = inspector
 
-    def ingest(self, *, course_id: str, title: str, filename: str, declared_media_type: str | None, fileobj: BinaryIO, user_id: int) -> DocumentIngestionResult:
+    def ingest(self, *, course_id: str, title: str, filename: str, declared_media_type: str | None, fileobj: BinaryIO) -> DocumentIngestionResult:
         inspection = self._inspector.inspect(
             filename=filename,
             declared_media_type=declared_media_type,
@@ -49,26 +49,7 @@ class DocumentIngestionService:
         )
 
         if duplicate is not None:
-            owner_exists = self._db.scalar(
-                select(DocumentOwnerRecord).where(
-                    DocumentOwnerRecord.document_id == duplicate.document_id,
-                    DocumentOwnerRecord.user_id == user_id,
-                )
-            )
-            if owner_exists is not None:
-                raise DuplicateDocumentError("You have already uploaded this document to the course.")
-            self._db.add(DocumentOwnerRecord(document_id=duplicate.document_id, user_id=user_id))
-            self._db.commit()
-            return DocumentIngestionResult(
-                document_id=duplicate.document_id,
-                version_id=duplicate.version_id,
-                job_id="existing",
-                course_id=course_id,
-                title=duplicate.document.title,
-                original_filename=duplicate.original_filename,
-                file_size_bytes=duplicate.file_size_bytes,
-                status="existing",
-            )
+            raise DuplicateDocumentError("This document has already been uploaded to the course.")
 
         document_id = uuid4().hex
         version_id = uuid4().hex
@@ -85,7 +66,7 @@ class DocumentIngestionService:
         document = DocumentRecord(
             document_id=document_id,
             course_id=course_id,
-            owner_ref=str(user_id),
+            owner_ref=None,
             title=title,
             is_published=False,
         )
@@ -111,7 +92,7 @@ class DocumentIngestionService:
             pipeline_version="1",
         )
 
-        self._db.add_all([document, version, job, DocumentOwnerRecord(document_id=document_id, user_id=user_id)])
+        self._db.add_all([document, version, job])
 
         try:
             self._db.commit()
