@@ -26,6 +26,7 @@ type PublishedCourseDocument = {
   original_filename: string;
   file_size_bytes: number;
   created_at: string;
+  published_by?: { user_id: number; name: string; public_id?: string | null }[];
 };
 
 interface CourseOverviewProps {
@@ -51,6 +52,7 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
   const [course, setCourse] = useState<CourseDetails | null>(null);
   const [documents, setDocuments] = useState<PublishedCourseDocument[]>([]);
   const [activePreviewDocumentId, setActivePreviewDocumentId] = useState<string | null>(null);
+  const [publisherDocumentId, setPublisherDocumentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -185,10 +187,68 @@ const CourseOverview: React.FC<CourseOverviewProps> = ({ courseId }) => {
                         <p className="mt-1 truncate text-xs text-muted-foreground">
                           {document.original_filename} · {formatFileSize(document.file_size_bytes)} · {new Date(document.created_at).toLocaleDateString()}
                         </p>
+                        {document.published_by && document.published_by.length > 0 && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Published by {document.published_by.map((publisher) => publisher.name).join(", ")}
+                          </p>
+                        )}
                       </div>
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                        Published
-                      </span>
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          aria-expanded={publisherDocumentId === document.document_id}
+                          aria-label={`Show users publishing ${document.title}`}
+                          onClick={() =>
+                            setPublisherDocumentId((current) =>
+                              current === document.document_id ? null : document.document_id,
+                            )
+                          }
+                          className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 hover:bg-emerald-200"
+                        >
+                          Published
+                        </button>
+                        {publisherDocumentId === document.document_id && (
+                          <div
+                            role="dialog"
+                            aria-label={`Users publishing ${document.title}`}
+                            className="absolute right-0 top-7 z-20 w-56 rounded-md border border-border bg-background p-3 text-left shadow-lg"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-semibold text-foreground">Published by</p>
+                              <button
+                                type="button"
+                                aria-label="Close publishers"
+                                onClick={() => setPublisherDocumentId(null)}
+                                className="text-sm leading-none text-muted-foreground hover:text-foreground"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            {document.published_by && document.published_by.length > 0 ? (
+                              <ul className="mt-2 space-y-1">
+                                {document.published_by.map((publisher) => (
+                                  <li key={publisher.user_id} className="text-xs">
+                                    {publisher.public_id ? (
+                                      <Link
+                                        href={`/users/${encodeURIComponent(publisher.public_id)}/profile`}
+                                        className="text-primary underline-offset-2 hover:underline"
+                                      >
+                                        {publisher.name}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-muted-foreground">{publisher.name}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                Publisher information is unavailable.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
