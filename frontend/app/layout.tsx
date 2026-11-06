@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Figtree } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import AssistantWidget from "@/components/assistant/AssistantWidget";
+import { PomodoroProvider } from "@/components/dashboard/PomodoroProvider";
 
 const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
 
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           className="min-w-0 flex-1"
           style={{ marginRight: "var(--assistant-width, 0px)" }}
         >
-          {children}
+          <PomodoroProvider>{children}</PomodoroProvider>
         </div>
 
         <AssistantWidget />
