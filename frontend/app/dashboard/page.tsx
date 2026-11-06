@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {useSyncExternalStore} from "react";
+import {useEffect, useState} from "react";
 import {HugeiconsIcon} from "@hugeicons/react";
 import {
     ArrowRight01Icon,
@@ -149,6 +150,9 @@ function SectionHeading({
 
 export default function StudentDashboardPage() {
     const {tasks, toggleTask} = useStudyTasks();
+    const [passwordNeedsUpdate, setPasswordNeedsUpdate] = useState(false);
+    const [showPasswordBanner, setShowPasswordBanner] = useState(true);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const upcomingTasks = tasks
         .filter((task) => !task.completed)
         .sort((first, second) => first.dueDate.localeCompare(second.dueDate))
@@ -166,6 +170,28 @@ export default function StudentDashboardPage() {
             0
         ) / savedCourses.length
     );
+
+    useEffect(() => {
+        const userId = localStorage.getItem("user_id");
+        const isAuthenticated = localStorage.getItem("auth_session") === "authenticated";
+        if (!userId || !isAuthenticated) {
+            return;
+        }
+        fetch(`/api/users/${encodeURIComponent(userId)}`, {cache: "no-store"})
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Unable to load account security status.");
+                }
+                return response.json() as Promise<{password_needs_update?: boolean}>;
+            })
+            .then((user) => {
+                setCurrentUserId(userId);
+                setPasswordNeedsUpdate(user.password_needs_update === true);
+            })
+            .catch((error) => {
+                console.error("Unable to load account security status.", error);
+            });
+    }, []);
 
     return (
         <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
@@ -189,6 +215,26 @@ export default function StudentDashboardPage() {
                         place.
                     </p>
                 </div>
+
+                {passwordNeedsUpdate && showPasswordBanner && (
+                    <div className="relative rounded-md border border-amber-300 bg-amber-50 px-4 py-3 pr-10 text-sm text-amber-950">
+                        <button
+                            type="button"
+                            onClick={() => setShowPasswordBanner(false)}
+                            className="absolute right-3 top-2 text-lg leading-none text-amber-800"
+                            aria-label="Dismiss password reminder"
+                        >
+                            ×
+                        </button>
+                        <p className="font-semibold">Your password needs an update.</p>
+                        <p className="mt-1">
+                            Please choose a stronger password with an uppercase letter and special character.{" "}
+                            <Link className="font-semibold underline" href={`/users/${currentUserId}/settings`}>
+                                Update your password
+                            </Link>
+                        </p>
+                    </div>
+                )}
 
                 <section id="quick-actions">
                     <SectionHeading
