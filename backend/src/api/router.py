@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.api.v1.auth import router as auth_router
+from src.api.v1.flashcards import router as flashcards_router
 from src.api.v1.chat import router as chat_router
 from src.api.v1.courses import router as courses_router
 from src.api.v1.documents import router as documents_router
@@ -18,3 +19,4 @@ api_router.include_router(documents_router)
 api_router.include_router(chat_router)
 api_router.include_router(sources_router)
 api_router.include_router(professor_reviews_router)
+api_router.include_router(flashcards_router)

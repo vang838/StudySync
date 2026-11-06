@@ -64,6 +64,110 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    user_flashcards: Mapped[list["FlashcardSets"]] = relationship(
+        "FlashcardSets",
+        back_populates="author",
+        cascade="all, delete-orphan",
+    )
+
+class FlashcardSets(Base):
+    __tablename__ = "flashcard_sets"
+
+    flashcardsets_id: Mapped[int] = mapped_column(
+        "flashcard_set_id", Integer, primary_key=True, autoincrement=True
+    )
+
+    user_id: Mapped[int] = mapped_column(
+            ForeignKey("users.user_id", ondelete="CASCADE"),
+            index=True,
+            nullable=False,
+        )
+    course_id: Mapped[str] = mapped_column(
+                ForeignKey("courses.course_id", ondelete="RESTRICT"),
+                index=True,
+                nullable=False,
+            )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    author: Mapped["User"] = relationship(
+        back_populates="user_flashcards"
+    )
+    course: Mapped["Course"] = relationship()
+    cards: Mapped[list["Flashcard"]] = relationship(
+        back_populates="set",
+        cascade="all, delete-orphan",
+        order_by="Flashcard.position"
+    )
+
+class Flashcard(Base):
+    __tablename__ = "flashcard"
+
+    flashcard_id: Mapped[int] = mapped_column(Integer, primary_key=True,autoincrement=True)
+
+    flashcardsets_id: Mapped[int] = mapped_column(
+            ForeignKey("flashcard_sets.flashcard_set_id", ondelete="CASCADE"),
+            index=True,
+            nullable=False,
+        )
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    set: Mapped["FlashcardSets"] = relationship(
+        back_populates="cards"
+    )
+
+    progress: Mapped[list["FlashcardStudyProgress"]] = relationship(
+        back_populates="card",
+        cascade="all, delete-orphan"
+    )
+
+class FlashcardStudyProgress(Base):
+    __tablename__ = "flashcard_study_progress"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "flashcard_id",
+            name="uq_flashcard_progress_user_card"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    flashcard_id: Mapped[int] = mapped_column(
+        ForeignKey("flashcard.flashcard_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    rating: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )
+
+    last_reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow
+    )
+
+    card: Mapped["Flashcard"] = relationship(
+        back_populates="progress"
+    )
 
 class ChatThreadRecord(Base):
     __tablename__ = "chat_threads"

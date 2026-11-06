@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, StringConstraints
 
 from src.schemas.retrieval import Citation, GeneratedClaim
 
@@ -134,6 +134,36 @@ class ChatThread(BaseModel):
     citations: list[Citation]
     claims: list[GeneratedClaim]
 
+class CardInput(BaseModel):
+    flashcard_id: int | None = Field(default=None, gt=0)
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+class SetInput(BaseModel):
+    course_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    description: str | None = None
+    cards: list[CardInput] = Field(min_length=1)
+
+class CardOut(CardInput):
+    model_config = ConfigDict(from_attributes=True)
+
+    flashcard_id: int
+    position: int
+
+class SetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    flashcardsets_id: int
+    user_id: int
+    course_id: str
+    title: str
+    description: str | None
+    created_at: datetime
+    cards: list[CardOut]
+
+class RatingInput(BaseModel):
+    rating: Literal["easy", "practice", "hard"]
 
 class ChatCreateResponse(ChatThread):
     pass

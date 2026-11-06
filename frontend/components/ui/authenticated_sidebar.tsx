@@ -5,7 +5,6 @@ import {useState} from "react";
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarGroup,
     SidebarGroupLabel,
     SidebarGroupContent,
@@ -60,8 +59,8 @@ export default function Sidebars({children}: { children: React.ReactNode; }) {
                                           </Link>
                                         </SidebarMenuItem>
                                         <SidebarMenuItem>
-                                          <div onClick={handleClick}>
-                                              <SidebarMenuButton className="w-full">
+                                          <div>
+                                              <SidebarMenuButton className="w-full" onClick={handleClick} aria-expanded={isClicked}>
                                                   Study Tools
                                               </SidebarMenuButton>
                                               {isClicked && (
@@ -93,7 +92,9 @@ export default function Sidebars({children}: { children: React.ReactNode; }) {
                                                           <SidebarMenuButton>My Planner</SidebarMenuButton>
                                                       </SidebarMenuItem>
                                                       <SidebarMenuItem>
-                                                          <SidebarMenuButton>Timer</SidebarMenuButton>
+                                                          <Link href="/dashboard/timer" className="block w-full">
+                                                            <SidebarMenuButton>Timer</SidebarMenuButton>
+                                                          </Link>
                                                       </SidebarMenuItem>
                                                     </SidebarMenu>  
                                                 </div> 
