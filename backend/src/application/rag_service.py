@@ -40,6 +40,7 @@ class RAGService:
         course_id: str,
         document_ids: list[str] | None = None,
         top_k: int = 5,
+        hint_level: int | None = None,
     ) -> RAGResult:
         question = question.strip()
 
@@ -60,7 +61,7 @@ class RAGService:
                 evidence_status="insufficient",
             )
 
-        analysis = self._analysis_service.generate(question=question, evidence=evidence)
+        analysis = self._analysis_service.generate(question=question, evidence=evidence, hint_level=hint_level)
         citations = (
             []
             if analysis.status == "insufficient"

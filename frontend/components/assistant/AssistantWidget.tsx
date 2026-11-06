@@ -175,6 +175,9 @@ export default function AssistantWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hintLevel, setHintLevel] = useState(1);
+  const [activeQuestion, setActiveQuestion] = useState("");
+  const [activeCourseId, setActiveCourseId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>(
@@ -292,6 +295,9 @@ export default function AssistantWidget() {
     setError(null);
     setLoading(true);
 
+    setHintLevel(1);
+    setActiveCourseId(selectedCourseId);
+
     setMessages((current) => [
       ...current,
       {
@@ -311,7 +317,58 @@ export default function AssistantWidget() {
         },
         body: JSON.stringify({
           question,
+          hint_level: 1,
           ...(selectedCourseId ? { course_id: selectedCourseId } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Assistant request failed");
+      }
+
+      const data: ChatResponse = await response.json();
+      setActiveQuestion(question);
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: data.answer,
+          mode: data.mode,
+          evidenceStatus: data.evidence_status,
+          citations: data.citations,
+          claims: data.claims,
+        },
+      ]);
+    } catch (error) {
+      console.error("Unable to generate assistant response.", error);
+      setError("Failed to get a response. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleNextHint() {
+    if (loading || !activeQuestion || hintLevel >= 4) {
+      return;
+    }
+
+    const nextLevel = hintLevel + 1;
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+      },
+      body: JSON.stringify({
+          question: activeQuestion,
+          hint_level: nextLevel,
+          ...(activeCourseId ? { course_id: activeCourseId } : {}),
         }),
       });
 
@@ -333,9 +390,11 @@ export default function AssistantWidget() {
           claims: data.claims,
         },
       ]);
+
+      setHintLevel(nextLevel);
     } catch (error) {
-      console.error("Unable to generate assistant response.", error);
-      setError("Failed to get a response. Please try again.");
+      console.error("Unable to generate next hint.", error);
+      setError("Failed to get the next hint. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -454,6 +513,17 @@ export default function AssistantWidget() {
           </div>
 
           <div className="border-t p-4">
+            {activeQuestion && hintLevel < 4 && !loading && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleNextHint}
+                className="mb-3 w-full"
+              >
+                Next Hint (Level {hintLevel + 1})
+              </Button>
+            )}
+
             <form onSubmit={handleSubmit} className="flex gap-2">
               <input
                 type="text"

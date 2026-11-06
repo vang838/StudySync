@@ -138,6 +138,26 @@ class TestEvidenceAnalysisService(unittest.TestCase):
         with self.assertRaises(LLMResponseError):
             self.service.generate(question="What does TCP provide?", evidence=self.evidence)
 
+    def test_hint_levels_are_included_in_prompt(self):
+        expected_instructions = {
+            1: "Give only a brief conceptual hint.",
+            2: "Give a stronger hint",
+            3: "Explain the relevant concepts",
+            4: "Provide deeper guidance",
+        }
+
+        for level, instruction in expected_instructions.items():
+            with self.subTest(hint_level=level):
+                prompt = self.service._build_prompt(
+                    question="What does TCP provide?",
+                    evidence=self.evidence,
+                    hint_level=level,
+                )
+
+                self.assertIn(instruction, prompt)
+                self.assertIn("What does TCP provide?", prompt)
+                self.assertIn("internal:chunk-1", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
