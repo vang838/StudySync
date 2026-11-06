@@ -54,7 +54,7 @@ const fetchCourses = async (
     filters: CourseSearchFilters,
     query: string,
     savedOnly: boolean,
-    userId: number,
+    userId: number | null,
     page: number,
     perPage: number,
 ): Promise<CourseSearchResult> => {
@@ -130,16 +130,23 @@ export default function CourseSearchPage() {
 
     const getCurrentUserId = useCallback(() => {
         if (typeof window === 'undefined') {
-            return 1;
+            return null;
         }
 
         const rawUserId = window.localStorage.getItem('user_id');
-        const parsedUserId = Number(rawUserId ?? '1');
-        return Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : 1;
+        if (!rawUserId) {
+            return null;
+        }
+        const parsedUserId = Number(rawUserId);
+        return Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : null;
     }, []);
 
     const syncSavedCourses = useCallback(async () => {
         const userId = getCurrentUserId();
+        if (userId === null) {
+            setSavedCourseIds([]);
+            return;
+        }
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), 10000);
 
@@ -243,6 +250,10 @@ export default function CourseSearchPage() {
 
     const handleSaveToggle = useCallback(async (courseId: string) => {
         const userId = getCurrentUserId();
+        if (userId === null) {
+            setError('Please sign in to save courses.');
+            return;
+        }
         const isSaved = savedCourseIds.includes(courseId);
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), 10000);

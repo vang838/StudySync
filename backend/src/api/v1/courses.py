@@ -22,6 +22,7 @@ from src.core.forum_points import (
     POINTS_PER_FORUM_POST_OR_REPLY,
 )
 from src.db.session import get_db
+from src.api.dependencies import get_current_user
 from src.schemas.contracts import (
     CourseCreateRequest,
     ForumPostCreateRequest,
@@ -54,6 +55,7 @@ def _serialize_saved_course(course: Course, membership: UserCourseSave) -> dict:
 def _serialize_user(user: User) -> dict:
     return {
         "user_id": user.user_id,
+        "public_id": user.public_id,
         "first_name": user.user_first_name,
         "last_name": user.user_last_name,
         "full_name": f"{user.user_first_name} {user.user_last_name}".strip(),
@@ -748,7 +750,10 @@ def list_saved_courses(
         description="When true, include archived courses saved by the user.",
     ),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> List[dict]:
+    if user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You may only access your own saved courses.")
     user = _get_user_or_404(db, user_id)
     query = (
         select(Course, UserCourseSave)

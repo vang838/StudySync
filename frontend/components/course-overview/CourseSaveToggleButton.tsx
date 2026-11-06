@@ -12,10 +12,13 @@ const CourseSaveToggleButton = ({ courseId }: CourseSaveToggleButtonProps) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const getCurrentUserId = useCallback(() => {
+  const getCurrentUserId = useCallback((): number | null => {
     const rawUserId = window.localStorage.getItem("user_id");
-    const parsedUserId = Number(rawUserId ?? "1");
-    return Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : 1;
+    if (!rawUserId) {
+      return null;
+    }
+    const parsedUserId = Number(rawUserId);
+    return Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : null;
   }, []);
 
   const toggleSave = useCallback(async () => {
@@ -26,6 +29,9 @@ const CourseSaveToggleButton = ({ courseId }: CourseSaveToggleButtonProps) => {
     setSaving(true);
     try {
       const userId = getCurrentUserId();
+      if (userId === null) {
+        return;
+      }
       const response = await fetch(`/api/courses/${encodeURIComponent(courseId)}/save?user_id=${userId}`, {
         method: isSaved ? "DELETE" : "POST",
       });
@@ -44,6 +50,9 @@ const CourseSaveToggleButton = ({ courseId }: CourseSaveToggleButtonProps) => {
     async function loadSavedState() {
       try {
         const userId = getCurrentUserId();
+        if (userId === null) {
+          return;
+        }
         const response = await fetch(`/api/courses/saved?user_id=${userId}`);
         if (!isActive) {
           return;

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getPasswordRules, isStrongPassword } from "@/lib/passwordRules";
 export default function SignUp()
 {
     const router = useRouter();
@@ -20,9 +21,9 @@ export default function SignUp()
         setError("");
         setSuccess("");
 
-         if (password.length < 8) 
+         if (!isStrongPassword(password))
         {
-            setError("Password must be at least 8 characters.");
+            setError("Password does not meet all requirements.");
             return;
         }
 
@@ -48,6 +49,7 @@ export default function SignUp()
         }
 
         localStorage.setItem("user_id", String(data.user.user_id));
+        localStorage.setItem("auth_session", "authenticated");
         router.push("/dashboard");
         router.refresh();
         } catch {
@@ -90,6 +92,13 @@ export default function SignUp()
                             <div>
                                 <label htmlFor ="pwd"></label>
                                 <input type="password" placeholder="Enter Password" onChange={(e) => setPassword(e.target.value)} name="pwd" id="pwd" value={password} required />
+                                <ul className="mt-2 space-y-1 text-xs">
+                                    {getPasswordRules(password).map((rule) => (
+                                        <li key={rule.label} className={rule.valid ? "text-green-700" : "text-red-600"}>
+                                            {rule.valid ? "✓" : "✕"} {rule.label}
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
 
                             {error && <p className="auth-error">{error}</p>}

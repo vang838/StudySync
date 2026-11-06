@@ -86,20 +86,33 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
 
   const focusMode = typeof focusPostId === "number";
 
-  const getCurrentUserId = (): number => {
+  const getCurrentUserId = (): number | null => {
     if (typeof window === "undefined") {
-      return 1;
+      return null;
     }
     const raw = window.localStorage.getItem("user_id");
-    const parsed = Number(raw ?? "1");
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    if (!raw) {
+      return null;
+    }
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const requireCurrentUserId = (): number => {
+    const userId = getCurrentUserId();
+    if (userId === null) {
+      throw new Error("Please sign in to participate in the forum.");
+    }
+    return userId;
   };
 
   const buildForumQueryString = useCallback((): string => {
     const params = new URLSearchParams();
     const currentUserId = getCurrentUserId();
 
-    params.set("user_id", String(currentUserId));
+    if (currentUserId !== null) {
+      params.set("user_id", String(currentUserId));
+    }
     params.set("sort", sortOption);
 
     const trimmedSearch = searchQuery.trim();
@@ -108,7 +121,9 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     }
 
     if (discussionFilter === "mine") {
-      params.set("author_user_id", String(currentUserId));
+      if (currentUserId !== null) {
+        params.set("author_user_id", String(currentUserId));
+      }
     } else if (discussionFilter === "bookmarked") {
       params.set("bookmarked_only", "true");
     }
@@ -133,8 +148,9 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
       setForumPosts(Array.isArray(listData) ? (listData as ForumPost[]) : []);
 
       if (focusMode && focusPostId !== undefined) {
+        const focusedUrl = `/api/courses/${encodeURIComponent(courseId)}/forum/posts/${focusPostId}`;
         const focusedResponse = await fetch(
-          `/api/courses/${encodeURIComponent(courseId)}/forum/posts/${focusPostId}?user_id=${currentUserId}`,
+          currentUserId === null ? focusedUrl : `${focusedUrl}?user_id=${currentUserId}`,
         );
         if (!focusedResponse.ok) {
           const body = await focusedResponse.json().catch(() => ({}));
@@ -166,7 +182,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     setForumError(null);
     try {
       const payload: { user_id: number; content: string; parent_post_id?: number } = {
-        user_id: getCurrentUserId(),
+        user_id: requireCurrentUserId(),
         content: content.trim(),
       };
       if (parentPostId !== undefined) {
@@ -210,7 +226,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          user_id: getCurrentUserId(),
+          user_id: requireCurrentUserId(),
           content: editDraft.trim(),
         }),
       });
@@ -235,7 +251,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     setSubmitting(true);
     setForumError(null);
     try {
-      const userId = getCurrentUserId();
+      const userId = requireCurrentUserId();
       const response = await fetch(
         `/api/courses/${encodeURIComponent(courseId)}/forum/posts/${postId}?user_id=${userId}`,
         { method: "DELETE" },
@@ -262,7 +278,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     setSubmitting(true);
     setForumError(null);
     try {
-      const userId = getCurrentUserId();
+      const userId = requireCurrentUserId();
       const response = await fetch(
         `/api/courses/${encodeURIComponent(courseId)}/forum/posts/${postId}/bookmark?user_id=${userId}`,
         { method: currentlyBookmarked ? "DELETE" : "POST" },
@@ -284,7 +300,7 @@ export default function CourseForumSection({ courseId, focusPostId }: CourseForu
     setSubmitting(true);
     setForumError(null);
     try {
-      const userId = getCurrentUserId();
+      const userId = requireCurrentUserId();
       const response = await fetch(
         `/api/courses/${encodeURIComponent(courseId)}/forum/posts/${postId}/like?user_id=${userId}`,
         { method: currentlyLiked ? "DELETE" : "POST" },

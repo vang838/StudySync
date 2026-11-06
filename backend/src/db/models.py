@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from sqlalchemy import (
     BigInteger,
@@ -24,10 +25,12 @@ class User(Base):
     __tablename__ = "users"
 
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True,autoincrement=True)
+    public_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
     user_first_name: Mapped[str] = mapped_column(String(128), nullable=False)
     user_last_name: Mapped[str] = mapped_column(String(128), nullable=False)
     user_email: Mapped[str] = mapped_column(String(128), unique=True, index=True,nullable=False)
     password_hash: Mapped[str] = mapped_column(String(258),nullable=False)
+    password_needs_update: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     forum_points_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
@@ -452,6 +455,33 @@ class DocumentRecord(Base):
         cascade="all, delete-orphan",
         order_by="DocumentVersionRecord.version_number",
     )
+    owners: Mapped[list["DocumentOwnerRecord"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan",
+    )
+    publications: Mapped[list["DocumentPublicationRecord"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan",
+    )
+
+
+class DocumentOwnerRecord(Base):
+    __tablename__ = "document_owners"
+    __table_args__ = (UniqueConstraint("document_id", "user_id", name="uq_document_owner"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.document_id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), index=True)
+    document: Mapped["DocumentRecord"] = relationship(back_populates="owners")
+
+
+class DocumentPublicationRecord(Base):
+    __tablename__ = "document_publications"
+    __table_args__ = (UniqueConstraint("document_id", "user_id", name="uq_document_publication"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.document_id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), index=True)
+    document: Mapped["DocumentRecord"] = relationship(back_populates="publications")
+    user: Mapped["User"] = relationship()
 
 class DocumentVersionRecord(Base):
     __tablename__ = "document_versions"
