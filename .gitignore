@@ -219,3 +219,13 @@ __marimo__/
 
 # Local SQLite database
 backend/studysync.db
+
+# Flashcard source files are not Python build artifacts.
+!/frontend/lib/
+/frontend/lib/*
+!/frontend/lib/utils.ts
+!/frontend/lib/flashcard.ts
+!/frontend/lib/flashcard-proxy.ts
+!/frontend/lib/types/
+/frontend/lib/types/*
+!/frontend/lib/types/flashcard.ts
