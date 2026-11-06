@@ -36,12 +36,27 @@ export async function POST(
     });
 
     const text = await response.text();
-    return new NextResponse(text, {
+    const nextResponse = new NextResponse(text, {
       status: response.status,
       headers: {
         'content-type': response.headers.get('content-type') ?? 'application/json',
       },
     });
+    if (action === 'login' || action === 'signup') {
+      const body = JSON.parse(text) as { access_token?: string };
+      if (body.access_token) {
+        nextResponse.cookies.set('studysync_session', body.access_token, {
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          path: '/',
+          maxAge: 60 * 60 * 24 * 7,
+        });
+      }
+    } else if (action === 'logout') {
+      nextResponse.cookies.delete('studysync_session');
+    }
+    return nextResponse;
   } catch {
     return NextResponse.json(
       { detail: 'Unable to reach backend auth service.' },

@@ -8,16 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 type UserProfile = {
-  user_id: number;
+  user_id?: number;
   first_name: string;
   last_name: string;
   full_name: string;
-  email: string;
+  email?: string;
+  discussion_activity?: UserDiscussionActivityPost[];
   forum_points: number;
   forum_point_values?: {
     post_or_reply: number;
     like_received: number;
   };
+};
+
+type UserDiscussionActivityPost = {
+    post_id: number;
+    course_id: string;
+    content: string;
+    created_at: string;
+    role_label: "Posted" | "Replied" | "Posted & Replied";
 };
 
 type SavedCourse = {
@@ -48,26 +57,6 @@ type BookmarkedForumPost = {
   content: string;
   created_at: string;
   reply_count: number;
-};
-
-type ForumPostTree = {
-  post_id: number;
-  course_id: string;
-  user_id: number;
-  author_name: string;
-  content: string;
-  created_at: string;
-  reply_count: number;
-  is_bookmarked: boolean;
-  replies: ForumPostTree[];
-};
-
-type UserDiscussionActivityPost = {
-  post_id: number;
-  course_id: string;
-  content: string;
-  created_at: string;
-  role_label: "Posted" | "Replied" | "Posted & Replied";
 };
 
 const PAGE_SIZE = 12;
@@ -125,34 +114,6 @@ const getPaginationItems = (page: number, totalPages: number): Array<number | "e
   return items;
 };
 
-const hasReplyByUser = (replies: ForumPostTree[], userId: number): boolean => {
-  for (const reply of replies) {
-    if (reply.user_id === userId || hasReplyByUser(reply.replies ?? [], userId)) {
-      return true;
-    }
-  }
-  return false;
-};
-
-const collectBookmarkedPosts = (
-  posts: ForumPostTree[],
-  accumulator: BookmarkedForumPost[],
-): void => {
-  for (const post of posts) {
-    if (post.is_bookmarked) {
-      accumulator.push({
-        post_id: post.post_id,
-        course_id: post.course_id,
-        author_name: post.author_name,
-        content: post.content,
-        created_at: post.created_at,
-        reply_count: post.reply_count,
-      });
-    }
-    collectBookmarkedPosts(post.replies ?? [], accumulator);
-  }
-};
-
 export default function UserProfilePage({
   params,
 }: {
@@ -170,40 +131,7 @@ export default function UserProfilePage({
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
-  const [activeUserId, setActiveUserId] = useState<number | null>(null);
-  const [archivingCourseIds, setArchivingCourseIds] = useState<string[]>([]);
   const [showArchivedCourses, setShowArchivedCourses] = useState(false);
-
-  const setCourseArchivedState = async (courseId: string, shouldArchive: boolean) => {
-    if (!activeUserId || archivingCourseIds.includes(courseId)) {
-      return;
-    }
-
-    setArchivingCourseIds((current) => [...current, courseId]);
-    try {
-      const response = await fetch(
-        `/api/courses/${encodeURIComponent(courseId)}/archive?user_id=${activeUserId}`,
-        { method: shouldArchive ? "POST" : "DELETE" },
-      );
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body?.detail ?? `Failed to update archive state (HTTP ${response.status})`);
-      }
-      setSavedCourses((current) =>
-        current.map((course) => (
-          course.course_id === courseId
-            ? { ...course, is_archived: shouldArchive }
-            : course
-        )),
-      );
-    } catch (archiveError) {
-      const message = archiveError instanceof Error ? archiveError.message : "Unable to update course archive state.";
-      setError(message);
-    } finally {
-      setArchivingCourseIds((current) => current.filter((id) => id !== courseId));
-    }
-  };
 
   const toggleCourseFolder = (courseId: string) => {
     setExpandedCourseFolders((current) => ({
@@ -215,109 +143,29 @@ export default function UserProfilePage({
   useEffect(() => {
     const loadProfile = async () => {
       const { userId } = await params;
-      setResolvedUserId(userId);
       setLoading(true);
       setError(null);
 
       try {
-        const [userResponse, coursesResponse, documentsResponse] = await Promise.all([
-          fetch(`/api/users/${encodeURIComponent(userId)}`),
-          fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}&include_archived=true`),
-          fetch("/api/documents?published_only=true"),
-        ]);
+        const userResponse = await fetch(`/api/public-users/${encodeURIComponent(userId)}`);
 
         if (!userResponse.ok) {
           const body = await userResponse.json().catch(() => ({}));
           throw new Error(body?.detail ?? `Failed to load user profile (HTTP ${userResponse.status})`);
         }
 
-        if (!coursesResponse.ok) {
-          const body = await coursesResponse.json().catch(() => ({}));
-          throw new Error(body?.detail ?? `Failed to load saved courses (HTTP ${coursesResponse.status})`);
-        }
-
-        if (!documentsResponse.ok) {
-          const body = await documentsResponse.json().catch(() => ({}));
-          throw new Error(body?.detail ?? `Failed to load documents (HTTP ${documentsResponse.status})`);
-        }
-
         const userData = (await userResponse.json()) as UserProfile;
-        const courseData = (await coursesResponse.json()) as SavedCourse[];
-        const documentData = (await documentsResponse.json()) as UserDocument[];
-        const normalizedCourseData = Array.isArray(courseData)
-          ? courseData.map((course) => ({ ...course, is_archived: Boolean(course.is_archived) }))
-          : [];
-        const normalizedDocumentData = Array.isArray(documentData) ? documentData : [];
-        const parsedUserId = Number(userId);
-        const resolvedNumericUserId = Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : userData.user_id;
-        const activeCourses = normalizedCourseData.filter((course) => !course.is_archived);
-        const forumResponses = await Promise.all(
-          activeCourses.map((course) =>
-            fetch(
-              `/api/courses/${encodeURIComponent(course.course_id)}/forum/posts?user_id=${resolvedNumericUserId}&sort=newest`,
-            ),
-          ),
-        );
-        for (let index = 0; index < forumResponses.length; index += 1) {
-          const forumResponse = forumResponses[index];
-          if (!forumResponse.ok) {
-            const body = await forumResponse.json().catch(() => ({}));
-            throw new Error(
-              body?.detail
-              ?? `Failed to load forum participation for ${activeCourses[index]?.course_id ?? "a course"} (HTTP ${forumResponse.status})`,
-            );
-          }
-        }
-        const discussionPayloads = await Promise.all(forumResponses.map((response) => response.json()));
-        const flattenedBookmarkedPosts: BookmarkedForumPost[] = [];
-        const discussionActivity: UserDiscussionActivityPost[] = [];
-        for (const payload of discussionPayloads) {
-          if (!Array.isArray(payload)) {
-            continue;
-          }
-          const courseForumPosts = payload as ForumPostTree[];
-          collectBookmarkedPosts(courseForumPosts, flattenedBookmarkedPosts);
-          for (const post of courseForumPosts) {
-            const userPosted = post.user_id === resolvedNumericUserId;
-            const userReplied = hasReplyByUser(post.replies ?? [], resolvedNumericUserId);
-            if (!userPosted && !userReplied) {
-              continue;
-            }
-            discussionActivity.push({
-              post_id: post.post_id,
-              course_id: post.course_id,
-              content: post.content,
-              created_at: post.created_at,
-              role_label: userPosted && userReplied ? "Posted & Replied" : userPosted ? "Posted" : "Replied",
-            });
-          }
-        }
-        flattenedBookmarkedPosts.sort((a, b) => {
-          const aValue = Date.parse(a.created_at);
-          const bValue = Date.parse(b.created_at);
-          if (Number.isNaN(aValue) || Number.isNaN(bValue)) {
-            return b.post_id - a.post_id;
-          }
-          return bValue - aValue;
-        });
-        discussionActivity.sort((a, b) => {
-          const aValue = Date.parse(a.created_at);
-          const bValue = Date.parse(b.created_at);
-          if (Number.isNaN(aValue) || Number.isNaN(bValue)) {
-            return b.post_id - a.post_id;
-          }
-          return bValue - aValue;
-        });
+        const normalizedCourseData: SavedCourse[] = [];
+        const normalizedDocumentData: UserDocument[] = [];
 
         setUser(userData);
-        setActiveUserId(resolvedNumericUserId);
         setSavedCourses(normalizedCourseData);
         setDocuments(normalizedDocumentData);
         setExpandedCourseFolders(
           Object.fromEntries(normalizedCourseData.map((course) => [course.course_id, false])),
         );
-        setBookmarkedPosts(flattenedBookmarkedPosts);
-        setDiscussionActivityPosts(discussionActivity);
+        setBookmarkedPosts([]);
+        setDiscussionActivityPosts(userData.discussion_activity ?? []);
         setBookmarkedPage(1);
         setActivityPage(1);
       } catch (loadError) {
@@ -440,8 +288,6 @@ export default function UserProfilePage({
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-muted-foreground">Student Profile</p>
             <h1 className="font-heading text-3xl font-bold">{user.full_name}</h1>
-            <p className="text-sm text-muted-foreground">User ID: {resolvedUserId ?? user.user_id}</p>
-            <p className="text-sm text-muted-foreground">Forum Points: {user.forum_points}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/courses/course_search">
@@ -473,23 +319,14 @@ export default function UserProfilePage({
                   <p className="text-xs font-medium tracking-wide text-muted-foreground">Name</p>
                   <p className="mt-1 text-base text-foreground">{user.full_name}</p>
                 </div>
-                <div>
+                {user.email && <div>
                   <p className="text-xs font-medium tracking-wide text-muted-foreground">Email</p>
                   <p className="mt-1 text-base text-foreground">{user.email}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium tracking-wide text-muted-foreground">Saved courses</p>
-                  <p className="mt-1 text-base text-foreground">{activeSavedCourses.length}</p>
-                  {archivedSavedCourses.length > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {archivedSavedCourses.length} archived
-                    </p>
-                  )}
-                </div>
+                </div>}
               </CardContent>
             </Card>
 
-            <Card>
+            {false && <Card>
               <CardHeader>
                 <CardTitle>Saved Courses</CardTitle>
                 <CardDescription>Courses this student has bookmarked or joined.</CardDescription>
@@ -543,17 +380,6 @@ export default function UserProfilePage({
                               {course.course_id} · {course.subject} · {course.year}
                             </p>
                           </button>
-                          <Button
-                            type="button"
-                            size="s"
-                            variant={effectiveShowArchivedCourses ? "secondary" : "outline"}
-                            disabled={archivingCourseIds.includes(course.course_id)}
-                            onClick={() => {
-                              void setCourseArchivedState(course.course_id, !effectiveShowArchivedCourses);
-                            }}
-                          >
-                            {effectiveShowArchivedCourses ? "Restore" : "Archive"}
-                          </Button>
                         </div>
                         {Boolean(expandedCourseFolders[course.course_id]) && (
                           <div className="border-t border-border/60 p-3">
@@ -582,11 +408,11 @@ export default function UserProfilePage({
                   </div>
                 )}
               </CardContent>
-            </Card>
+            </Card>}
           </section>
 
           <aside className="space-y-6 lg:col-span-4">
-            <Card>
+            {false && <Card>
               <CardHeader>
                 <CardTitle>Bookmarked Posts</CardTitle>
                 <CardDescription>Saved discussions from your courses.</CardDescription>
@@ -670,7 +496,7 @@ export default function UserProfilePage({
                   </div>
                 )}
               </CardContent>
-            </Card>
+            </Card>}
             <Card>
               <CardHeader>
                 <CardTitle>Discussion Activity</CardTitle>

@@ -10,7 +10,7 @@ from src.schemas.contracts import (
     ForgotPasswordRequest,
     PasswordResetRequest,
 )
-from src.core.security import hash_password, verify_password
+from src.core.security import create_session_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -37,6 +37,7 @@ def resetpassword(payload: PasswordResetRequest, db: Session = Depends(get_db)):
         )
 
     existing_user.password_hash = hash_password(payload.password)
+    existing_user.password_needs_update = False
     db.commit()
     db.refresh(existing_user)
 
@@ -44,9 +45,11 @@ def resetpassword(payload: PasswordResetRequest, db: Session = Depends(get_db)):
         "message": "Password reset successfully.",
         "user": {
             "user_id": existing_user.user_id,
+            "public_id": existing_user.public_id,
             "first_name": existing_user.user_first_name,
             "last_name": existing_user.user_last_name,
             "email": existing_user.user_email,
+            "password_needs_update": existing_user.password_needs_update,
         },
     }
 
@@ -67,11 +70,14 @@ def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
 
     return {
         "message": "Login successful.",
+        "access_token": create_session_token(existing_user.user_id),
         "user": {
             "user_id": existing_user.user_id,
+            "public_id": existing_user.public_id,
             "first_name": existing_user.user_first_name,
             "last_name": existing_user.user_last_name,
             "email": existing_user.user_email,
+            "password_needs_update": existing_user.password_needs_update,
         },
     }
     
@@ -100,7 +106,8 @@ def signup(
         user_first_name=payload.first_name,
         user_last_name=payload.last_name,
         user_email=payload.email,
-        password_hash=hashed_password
+        password_hash=hashed_password,
+        password_needs_update=False,
     )
 
     # Save user
@@ -110,11 +117,14 @@ def signup(
 
     return {
         "message": "Account created successfully.",
+        "access_token": create_session_token(new_user.user_id),
         "user": {
             "user_id": new_user.user_id,
+            "public_id": new_user.public_id,
             "first_name": new_user.user_first_name,
             "last_name": new_user.user_last_name,
-            "email": new_user.user_email
+            "email": new_user.user_email,
+            "password_needs_update": new_user.password_needs_update,
         }
     }
 

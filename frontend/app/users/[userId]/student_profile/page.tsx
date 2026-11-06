@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ type UserProfile = {
   last_name: string;
   full_name: string;
   email: string;
+  password_needs_update: boolean;
   forum_points: number;
   forum_point_values?: {
     post_or_reply: number;
@@ -38,6 +40,8 @@ type UserDocument = {
   original_filename: string;
   file_size_bytes: number;
   created_at: string;
+  published_by?: { user_id: number; name: string }[];
+  is_published_by_current_user: boolean;
 };
 
 type DocumentDeleteResult = {
@@ -50,6 +54,8 @@ type DocumentDeleteResult = {
 type DocumentPublishResult = {
   document_id: string;
   is_published: boolean;
+  is_published_by_current_user: boolean;
+  published_by?: { user_id: number; name: string }[];
 };
 
 type BookmarkedForumPost = {
@@ -100,6 +106,12 @@ export default function StudentProfilePage({
   const [publishingDocumentIds, setPublishingDocumentIds] = useState<string[]>([]);
   const [deletingDocumentIds, setDeletingDocumentIds] = useState<string[]>([]);
   const [showArchivedCourses, setShowArchivedCourses] = useState(false);
+  const [showPasswordBanner, setShowPasswordBanner] = useState(true);
+  const [pendingPublishChange, setPendingPublishChange] = useState<{
+    document: UserDocument;
+    isPublished: boolean;
+    message: string;
+  } | null>(null);
 
   const setCourseArchivedState = async (courseId: string, shouldArchive: boolean) => {
     if (!activeUserId || archivingCourseIds.includes(courseId)) {
@@ -138,13 +150,14 @@ export default function StudentProfilePage({
     }));
   };
 
-  const setDocumentPublishState = async (documentId: string, isPublished: boolean) => {
-    if (publishingDocumentIds.includes(documentId)) {
+  const applyDocumentPublishState = async (documentToUpdate: UserDocument, isPublished: boolean) => {
+    if (publishingDocumentIds.includes(documentToUpdate.document_id)) {
       return;
     }
-    setPublishingDocumentIds((current) => [...current, documentId]);
+    setPendingPublishChange(null);
+    setPublishingDocumentIds((current) => [...current, documentToUpdate.document_id]);
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}`, {
+      const response = await fetch(`/api/documents/${encodeURIComponent(documentToUpdate.document_id)}`, {
         method: "PATCH",
         headers: {
           "content-type": "application/json",
@@ -161,10 +174,19 @@ export default function StudentProfilePage({
         );
       }
 
+      if (!body || !("is_published" in body)) {
+        throw new Error("Invalid publish state response.");
+      }
+
       setDocuments((current) =>
         current.map((document) => (
-          document.document_id === documentId
-            ? { ...document, is_published: isPublished }
+          document.document_id === documentToUpdate.document_id
+            ? {
+                ...document,
+                is_published: body.is_published,
+                is_published_by_current_user: body.is_published_by_current_user,
+                published_by: body.published_by,
+              }
             : document
         )),
       );
@@ -172,8 +194,23 @@ export default function StudentProfilePage({
       const message = publishError instanceof Error ? publishError.message : "Unable to update publish state.";
       setError(message);
     } finally {
-      setPublishingDocumentIds((current) => current.filter((id) => id !== documentId));
+      setPublishingDocumentIds((current) => current.filter((id) => id !== documentToUpdate.document_id));
     }
+  };
+
+  const setDocumentPublishState = (documentToUpdate: UserDocument, isPublished: boolean) => {
+    if (publishingDocumentIds.includes(documentToUpdate.document_id)) {
+      return;
+    }
+    const publisherCount = documentToUpdate.published_by?.length ?? 0;
+    const message = isPublished
+      ? publisherCount > 0
+        ? `This item is already published by ${publisherCount} other user${publisherCount === 1 ? "" : "s"}. Your copy will also be available to the class.`
+        : "This will publish your copy to the class for everyone to use."
+      : publisherCount > 1
+        ? `Your copy will become private, but the item will stay available because ${publisherCount - 1} other user${publisherCount === 2 ? "" : "s"} still publish it.`
+        : "You are the only person publishing this item. Making your copy private will remove it from the class for everyone.";
+    setPendingPublishChange({ document: documentToUpdate, isPublished, message });
   };
 
   const deleteDocument = async (documentId: string) => {
@@ -223,6 +260,16 @@ export default function StudentProfilePage({
       setError(null);
 
       try {
+        const authenticatedUserId = localStorage.getItem("user_id");
+        const isAuthenticated = localStorage.getItem("auth_session") === "authenticated";
+        if (
+          !isAuthenticated
+          || !authenticatedUserId
+          || authenticatedUserId !== userId
+        ) {
+          throw new Error("This private profile is only available to the signed-in user.");
+        }
+
         const [userResponse, coursesResponse, documentsResponse] = await Promise.all([
           fetch(`/api/users/${encodeURIComponent(userId)}`),
           fetch(`/api/courses/saved?user_id=${encodeURIComponent(userId)}&include_archived=true`),
@@ -346,6 +393,35 @@ export default function StudentProfilePage({
   }
 
   if (error) {
+    const isPrivateProfileError = error === "This private profile is only available to the signed-in user.";
+    if (isPrivateProfileError) {
+      return (
+        <main className="flex min-h-full items-center justify-center bg-background px-6 py-12 text-foreground">
+          <div className="flex max-w-lg flex-col items-center gap-5 text-center">
+            <Image
+              src="/finger-shake-judge-judy.gif"
+              alt="Judge Judy shaking her finger"
+              width={420}
+              height={280}
+              className="rounded-xl border border-border object-cover shadow-sm"
+              unoptimized
+            />
+            <div>
+              <h1 className="font-heading text-3xl font-bold">You shouldn&apos;t be here.</h1>
+              <p className="mt-2 text-muted-foreground">
+                This is a private profile. Please sign in as the account owner to continue.
+              </p>
+            </div>
+            <Link
+              href="/auth/signin"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+            >
+              Go to sign in
+            </Link>
+          </div>
+        </main>
+      );
+    }
     return <p className="text-sm font-medium text-destructive">{error}</p>;
   }
 
@@ -354,7 +430,60 @@ export default function StudentProfilePage({
   }
 
   return (
-    <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
+    <>
+      {pendingPublishChange && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-[2px]"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setPendingPublishChange(null);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="publish-change-title"
+            className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
+          >
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-xl">
+              {pendingPublishChange.isPublished ? "✨" : "🔒"}
+            </div>
+            <h2 id="publish-change-title" className="text-lg font-semibold text-foreground">
+              {pendingPublishChange.isPublished ? "Share this with the class?" : "Change publishing settings?"}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              <span className="font-medium text-foreground">{pendingPublishChange.document.title}</span>
+              {" — "}
+              {pendingPublishChange.message}
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setPendingPublishChange(null)}
+              >
+                Not yet
+              </Button>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => {
+                  void applyDocumentPublishState(
+                    pendingPublishChange.document,
+                    pendingPublishChange.isPublished,
+                  );
+                }}
+              >
+                {pendingPublishChange.isPublished ? "Publish my copy" : "Make my copy private"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 pb-10">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-col gap-1">
@@ -374,6 +503,27 @@ export default function StudentProfilePage({
         </header>
 
         <Separator />
+
+        {user.password_needs_update && showPasswordBanner && (
+          <div className="relative rounded-md border border-amber-300 bg-amber-50 px-4 py-3 pr-10 text-sm text-amber-950">
+            <button
+              type="button"
+              onClick={() => setShowPasswordBanner(false)}
+              className="absolute right-3 top-2 text-lg leading-none text-amber-800"
+              aria-label="Dismiss password reminder"
+            >
+              ×
+            </button>
+            <p className="font-semibold">Your password needs an update.</p>
+            <p className="mt-1">
+              Please choose a stronger password with an uppercase letter and special character.
+              {" "}
+              <Link className="font-semibold underline" href={`/users/${user.user_id}/settings`}>
+                Update your password
+              </Link>
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <section className="space-y-6 lg:col-span-8">
@@ -526,16 +676,19 @@ export default function StudentProfilePage({
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          void setDocumentPublishState(document.document_id, !document.is_published);
+                                          void setDocumentPublishState(
+                                            document,
+                                            !document.is_published_by_current_user,
+                                          );
                                         }}
                                         disabled={publishingDocumentIds.includes(document.document_id)}
                                         className="text-xs font-medium text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
                                       >
                                         {publishingDocumentIds.includes(document.document_id)
                                           ? "Updating..."
-                                          : document.is_published
-                                            ? "Make private"
-                                            : "Publish to class"}
+                                        : document.is_published_by_current_user
+                                            ? "Make my copy private"
+                                          : "Publish my copy"}
                                       </button>
                                       <button
                                         type="button"
@@ -598,6 +751,7 @@ export default function StudentProfilePage({
           </aside>
         </div>
       </div>
-    </main>
+      </main>
+    </>
   );
 }

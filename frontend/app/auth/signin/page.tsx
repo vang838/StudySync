@@ -38,6 +38,7 @@ export default function SignIn() {
             }
 
             localStorage.setItem("user_id", String(data.user.user_id));
+            localStorage.setItem("auth_session", "authenticated");
             router.push("/dashboard");
             router.refresh();
         } catch {

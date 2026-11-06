@@ -28,14 +28,15 @@ export default function Header() {
     const [isHovered, setIsHovered] = useState(false);
     const [userId, setUserId] = useState<number | null>(null);
     useEffect(() => {
+        const storedUserId = localStorage.getItem("user_id");
+        const isAuthenticated = localStorage.getItem("auth_session") === "authenticated";
 
-        const userId = localStorage.getItem("user_id");
-
-        if (!userId) {
+        if (!storedUserId || !isAuthenticated) {
+            localStorage.removeItem("user_id");
             return;
         }
 
-        fetch(`/api/users/${encodeURIComponent(userId)}`)
+        fetch(`/api/users/${encodeURIComponent(storedUserId)}`, {cache: "no-store"})
             .then((res) => {
                 if (!res.ok) throw new Error("Could not load user");
                 return res.json();
@@ -52,6 +53,7 @@ export default function Header() {
     async function logout() {
         await fetch("/api/auth/logout", {method: "POST"});
         localStorage.removeItem("user_id");
+        localStorage.removeItem("auth_session");
         window.location.replace("/auth/signin");
     }
 
@@ -109,9 +111,16 @@ export default function Header() {
                                                 {userId !== null && <Link href={`/users/${userId}/ratings`}
                                                                           className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Your
                                                     Ratings</Link>}
-                                                <button type="button" onClick={logout}
-                                                        className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Logout
-                                                </button>
+                                                {userId !== null ? (
+                                                    <button type="button" onClick={logout}
+                                                            className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Logout
+                                                    </button>
+                                                ) : (
+                                                    <Link href="/auth/signin"
+                                                          className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">
+                                                        Sign in
+                                                    </Link>
+                                                )}
                                             </CardContent>
                                         </Card>
                                     </div>
