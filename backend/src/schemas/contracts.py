@@ -2,6 +2,15 @@ from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
+from pydantic import field_validator
+
+
+def validate_password_strength(value: str) -> str:
+    if len(value) < 8 or not any(character.isupper() for character in value) or not any(
+        not character.isalnum() for character in value
+    ):
+        raise ValueError("Password must be at least 8 characters and include an uppercase letter and special character.")
+    return value
 
 from src.schemas.retrieval import Citation, GeneratedClaim
 
@@ -10,6 +19,12 @@ class UpdateUserRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
     last_name: str = Field(min_length=1, max_length=128)
     email: EmailStr
+    password: str | None = Field(default=None, min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def validate_optional_password(cls, value: str | None) -> str | None:
+        return validate_password_strength(value) if value is not None else None
 
 
 class AuthLoginRequest(BaseModel):
@@ -23,6 +38,8 @@ class AuthRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
 
+    _validate_password = field_validator("password")(validate_password_strength)
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -31,6 +48,8 @@ class ForgotPasswordRequest(BaseModel):
 class PasswordResetRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+
+    _validate_password = field_validator("password")(validate_password_strength)
 
 
 class CourseCreateRequest(BaseModel):
@@ -82,6 +101,12 @@ class DocumentUploadResponse(BaseModel):
     status: str
 
 
+class DocumentPublisherResponse(BaseModel):
+    user_id: int
+    name: str
+    public_id: str | None = None
+
+
 class DocumentListItemResponse(BaseModel):
     document_id: str
     version_id: str
@@ -91,6 +116,8 @@ class DocumentListItemResponse(BaseModel):
     original_filename: str
     file_size_bytes: int
     created_at: datetime
+    published_by: list[DocumentPublisherResponse] = Field(default_factory=list)
+    is_published_by_current_user: bool = False
 
 
 class DocumentPublishRequest(BaseModel):
@@ -100,6 +127,8 @@ class DocumentPublishRequest(BaseModel):
 class DocumentPublishResponse(BaseModel):
     document_id: str
     is_published: bool
+    published_by: list[DocumentPublisherResponse] = Field(default_factory=list)
+    is_published_by_current_user: bool = False
 
 
 class DocumentDeleteResponse(BaseModel):
