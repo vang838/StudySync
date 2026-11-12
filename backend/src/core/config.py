@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     ai_provider: str = Field(default="ollama", alias="AI_PROVIDER")
     ai_model: str = Field(default="qwen3:14b", alias="AI_MODEL")
     ai_timeout: float = Field(default=120.0,gt=0,alias="AI_TIMEOUT")
-
+    ai_api_key: str = Field(default="", alias="AI_API_KEY")
+    
     embedding_provider: str = Field(default="ollama", alias="EMBEDDING_PROVIDER")
     embedding_base_url: str = Field(default="http://127.0.0.1:11434", alias="EMBEDDING_BASE_URL")
     embedding_model: str = Field(default="qwen3-embedding:0.6b", alias="EMBEDDING_MODEL")
@@ -44,6 +45,7 @@ class Settings(BaseSettings):
     document_max_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0, alias="DOCUMENT_MAX_UPLOAD_BYTES")
     document_chunk_max_words: int = Field(default=300, gt=0, alias="DOCUMENT_CHUNK_MAX_WORDS")
     document_chunk_overlap_words: int = Field(default=50, ge=0, alias="DOCUMENT_CHUNK_OVERLAP_WORDS")
+    
     uwm_catalog_sync_on_startup: bool = Field(default=False, alias="UWM_CATALOG_SYNC_ON_STARTUP")  ################ Enable catalog sync on startup, this can be disabled during development or testing
     uwm_catalog_base_url: str = Field(default="https://catalog.uwm.edu", alias="UWM_CATALOG_BASE_URL")
     uwm_catalog_timeout_seconds: float = Field(default=20.0, gt=1.0, alias="UWM_CATALOG_TIMEOUT_SECONDS")

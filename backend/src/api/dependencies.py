@@ -6,6 +6,7 @@ from src.core.config import settings
 
 from src.adapters.llm.ollama import OllamaAdapter
 from src.adapters.embedding.ollama import OllamaEmbeddingAdapter
+from src.adapters.llm.openai_compatible import OpenAICompatibleAdapter
 
 from src.adapters.storage.local import LocalObjectStorageAdapter
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
@@ -186,11 +187,28 @@ def get_external_retrieval_port() -> Generator[ExternalRetrievalPort, None, None
         yield SearXNGExternalRetrievalAdapter(client=client)
 
 def get_llm_port() -> Generator[LLMPort, None, None]:
-    if settings.ai_provider != "ollama":
-        raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
+    if settings.ai_provider == "ollama":
+        with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
+            yield OllamaAdapter(client=client, model=settings.ai_model)
+        return
 
-    with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
-        yield OllamaAdapter(client=client, model=settings.ai_model)
+    if settings.ai_provider == "openai_compatible":
+        if not settings.ai_api_key.strip():
+            raise RuntimeError("AI_API_KEY is not configured.")
+
+        base_url = settings.ai_base_url.strip()
+        if not base_url.startswith("https://"):
+            raise RuntimeError("AI_BASE_URL must use HTTPS for hosted inference.")
+
+        with httpx.Client(
+            base_url=f"{base_url.rstrip('/')}/",
+            headers={"Authorization": f"Bearer {settings.ai_api_key}"},
+            timeout=settings.ai_timeout,
+        ) as client:
+            yield OpenAICompatibleAdapter(client=client, model=settings.ai_model)
+        return
+
+    raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
 
 def get_evidence_service() -> EvidenceService:
     return EvidenceService()

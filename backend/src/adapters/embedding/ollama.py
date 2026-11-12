@@ -6,7 +6,6 @@ from src.ports.embedding import (
     EmbeddingUnavailableError,
 )
 
-
 class OllamaEmbeddingAdapter:
     """Adapter for generating embeddings through an Ollama server."""
 
