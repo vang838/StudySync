@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     embedding_dimension: int = Field(default=1024, gt=0, alias="EMBEDDING_DIMENSION")
     embedding_timeout: float = Field(default=120.0, gt=0, alias="EMBEDDING_TIMEOUT")
     embedding_batch_size: int = Field(default=32,gt=0,alias="EMBEDDING_BATCH_SIZE")
-
+    embedding_api_key: str = Field(default="", alias="EMBEDDING_API_KEY")
+    
     external_retrieval_provider: str = Field(default="searxng", alias="EXTERNAL_RETRIEVAL_PROVIDER")
     external_retrieval_base_url: str = Field(default="http://127.0.0.1:8080", alias="EXTERNAL_RETRIEVAL_BASE_URL")
     external_retrieval_timeout: float = Field(default=20.0, gt=0, alias="EXTERNAL_RETRIEVAL_TIMEOUT")
