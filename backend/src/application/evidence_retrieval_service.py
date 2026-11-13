@@ -1,3 +1,5 @@
+from typing import Literal
+
 from src.application.document_retrieval_service import DocumentRetrievalService
 from src.application.evidence_ranking_service import EvidenceRankingService
 from src.application.evidence_service import EvidenceService
@@ -23,30 +25,42 @@ class EvidenceRetrievalService:
         self._ranking_service = ranking_service
         self._quality_service = quality_service or SourceQualityService()
 
+    
     def retrieve(
         self,
         *,
         query: str,
         course_id: str,
+        user_id: int,
         document_ids: list[str] | None = None,
         top_k: int = 5,
+        source_scope: Literal["documents", "external", "both"] = "both",
     ) -> list[Evidence]:
-        internal_results = self._document_retrieval.retrieve(
-            query=query,
-            course_id=course_id,
-            document_ids=document_ids,
-            top_k=top_k,
-        )
-        external_results = self._external_retrieval.search(query, top_k=top_k)
+        if source_scope not in ("documents", "external", "both"):
+            raise ValueError(f"Unsupported source scope: {source_scope}")
 
-        internal_evidence = self._quality_service.evaluate_all([
-            self._evidence_service.from_internal(result)
-            for result in internal_results
-        ])
-        external_evidence = self._quality_service.evaluate_all([
-            self._evidence_service.from_external(result)
-            for result in external_results
-        ])
+        internal_evidence: list[Evidence] = []
+        external_evidence: list[Evidence] = []
+
+        if source_scope in ("documents", "both"):
+            internal_results = self._document_retrieval.retrieve(
+                query=query,
+                course_id=course_id,
+                user_id=user_id,
+                document_ids=document_ids,
+                top_k=top_k,
+            )
+            internal_evidence = self._quality_service.evaluate_all([
+                self._evidence_service.from_internal(result)
+                for result in internal_results
+            ])
+
+        if source_scope in ("external", "both"):
+            external_results = self._external_retrieval.search(query, top_k=top_k)
+            external_evidence = self._quality_service.evaluate_all([
+                self._evidence_service.from_external(result)
+                for result in external_results
+            ])
 
         return self._ranking_service.rank(
             [internal_evidence, external_evidence],

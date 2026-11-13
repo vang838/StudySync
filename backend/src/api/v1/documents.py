@@ -12,6 +12,7 @@ from src.application.docs_upload import (
     EmptyDocumentError,
     UnsupportedDocumentTypeError,
 )
+
 from src.db.models import DocumentOwnerRecord, DocumentPublicationRecord, DocumentRecord, DocumentVersionRecord, User
 from src.db.session import get_db
 from src.ports.object_storage import (
@@ -20,11 +21,11 @@ from src.ports.object_storage import (
     ObjectStoragePort,
     ObjectStorageUnavailableError,
 )
+
 from src.schemas.contracts import DocumentDeleteResponse, DocumentListItemResponse, DocumentPublisherResponse, DocumentUploadResponse
 from src.schemas.contracts import DocumentPublishRequest, DocumentPublishResponse
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-
 
 @router.get("", response_model=list[DocumentListItemResponse])
 def list_documents(
@@ -57,6 +58,7 @@ def list_documents(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
     rows = db.execute(statement).all()
+
     def publisher_response(user_id: int) -> DocumentPublisherResponse:
         user = db.get(User, user_id)
         name = (
@@ -99,7 +101,6 @@ def list_documents(
         )
         for document, version in rows
     ]
-
 
 @router.post("", response_model=DocumentUploadResponse, status_code=status.HTTP_202_ACCEPTED)
 def upload_document(
@@ -149,7 +150,6 @@ def upload_document(
         file_size_bytes=result.file_size_bytes,
         status=result.status,
     )
-
 
 @router.delete("/{document_id}", response_model=DocumentDeleteResponse)
 def delete_document(
@@ -211,6 +211,7 @@ def download_document(
     preview: bool = Query(default=False),
     db: Session = Depends(get_db),
     storage: ObjectStoragePort = Depends(get_object_storage),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> Response:
     document = db.get(DocumentRecord, document_id)
     if document is None:
@@ -219,6 +220,21 @@ def download_document(
             detail="Document was not found.",
         )
 
+    can_access = (
+        document.is_published
+        or bool(document.publications)
+        or (
+            current_user is not None
+            and any(owner.user_id == current_user.user_id for owner in document.owners)
+        )
+    )
+
+    if not can_access:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document was not found.",
+        )
+    
     version = document.versions[-1] if document.versions else None
     if version is None:
         raise HTTPException(
@@ -252,7 +268,6 @@ def download_document(
             "Cache-Control": "no-store",
         },
     )
-
 
 @router.patch("/{document_id}/publish", response_model=DocumentPublishResponse)
 def set_document_publish_state(

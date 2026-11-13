@@ -25,12 +25,13 @@ class TestAssistantService(TestCase):
         self.rag_service.generate.assert_not_called()
 
     def test_routes_course_question_to_rag(self) -> None:
-        self.llm.generate.return_value = "COURSE"
+        
         citation = ExternalCitation(
             provider="searxng",
             title="Course Reference",
             url="https://example.com/course",
         )
+        
         self.rag_service.generate.return_value = RAGResult(
             answer="Course-grounded answer.",
             citations=[citation],
@@ -39,6 +40,7 @@ class TestAssistantService(TestCase):
         result = self.service.generate(
             question="How do I solve problem 7?",
             course_id="MATH101",
+            user_id=1,
         )
 
         self.assertEqual(result.answer, "Course-grounded answer.")
@@ -47,11 +49,14 @@ class TestAssistantService(TestCase):
         self.rag_service.generate.assert_called_once_with(
             question="How do I solve problem 7?",
             course_id="MATH101",
+            user_id=1,
+            document_ids=None,
+            source_scope="both",
             hint_level=None,
         )
+        self.llm.generate.assert_not_called()
 
     def test_passes_hint_level_to_rag(self) -> None:
-        self.llm.generate.return_value = "COURSE"
         self.rag_service.generate.return_value = RAGResult(
             answer="Conceptual hint.",
             citations=[],
@@ -60,28 +65,33 @@ class TestAssistantService(TestCase):
         result = self.service.generate(
             question="How do I solve problem 7?",
             course_id="MATH101",
+            user_id=1,
             hint_level=1,
         )
 
         self.assertEqual(result.answer, "Conceptual hint.")
         self.assertEqual(result.mode, "course")
+
         self.rag_service.generate.assert_called_once_with(
             question="How do I solve problem 7?",
             course_id="MATH101",
+            user_id=1,
+            document_ids=None,
+            source_scope="both",
             hint_level=1,
         )
+        self.llm.generate.assert_not_called()
 
     def test_routes_general_question_away_from_rag(self) -> None:
-        self.llm.generate.side_effect = ["GENERAL", "Pythagoras is traditionally credited."]
+        self.llm.generate.return_value = "Pythagoras is traditionally credited."
 
         result = self.service.generate(
             question="Who is credited with the Pythagorean theorem?",
-            course_id="MATH101",
         )
 
-        self.assertEqual(result.answer, "Pythagoras is traditionally credited.")
         self.assertEqual(result.mode, "general")
-        self.assertEqual(result.citations, [])
+        self.assertEqual(result.answer, "Pythagoras is traditionally credited.")
+        self.llm.generate.assert_called_once_with("Who is credited with the Pythagorean theorem?")
         self.rag_service.generate.assert_not_called()
 
     def test_rejects_empty_question(self) -> None:

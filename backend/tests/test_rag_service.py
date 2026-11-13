@@ -7,7 +7,6 @@ from src.application.rag_service import RAGService
 from src.ports.llm import LLMPort
 from src.schemas.retrieval import Evidence
 
-
 class TestRAGService(TestCase):
     def setUp(self) -> None:
         self.retrieval_service = Mock(spec=EvidenceRetrievalService)
@@ -82,6 +81,7 @@ class TestRAGService(TestCase):
         result = self.service.generate(
             question="What does TCP provide?",
             course_id="cs101",
+            user_id=1,
             document_ids=["doc-1"],
             top_k=3,
         )
@@ -89,8 +89,10 @@ class TestRAGService(TestCase):
         self.retrieval_service.retrieve.assert_called_once_with(
             query="What does TCP provide?",
             course_id="cs101",
+            user_id=1,
             document_ids=["doc-1"],
             top_k=3,
+            source_scope="both",
         )
         prompt = self.llm.generate.call_args.args[0]
         self.assertIn('"evidence_id": "internal:chunk-1"', prompt)
@@ -106,7 +108,7 @@ class TestRAGService(TestCase):
 
     def test_rejects_empty_question(self) -> None:
         with self.assertRaisesRegex(ValueError, "question must not be empty"):
-            self.service.generate(question="   ", course_id="cs101")
+            self.service.generate(question="   ", course_id="cs101", user_id=1)
 
         self.retrieval_service.retrieve.assert_not_called()
         self.llm.generate.assert_not_called()
@@ -117,8 +119,17 @@ class TestRAGService(TestCase):
         result = self.service.generate(
             question="What port does HTTPS use?",
             course_id="cs101",
+            user_id=1,
         )
 
+        self.retrieval_service.retrieve.assert_called_once_with(
+            query="What port does HTTPS use?",
+            course_id="cs101",
+            user_id=1,
+            document_ids=None,
+            top_k=5,
+            source_scope="both",
+        )
         self.assertEqual(
             result.answer,
             "I couldn't find enough information in the available evidence to answer that question.",
@@ -126,7 +137,6 @@ class TestRAGService(TestCase):
         self.assertEqual(result.citations, [])
         self.assertEqual(result.evidence_status, "insufficient")
         self.llm.generate.assert_not_called()
-
 
 if __name__ == "__main__":
     import unittest

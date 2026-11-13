@@ -174,7 +174,8 @@ class FlashcardStudyProgress(Base):
 
 class ChatThreadRecord(Base):
     __tablename__ = "chat_threads"
-
+    
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), index=True, nullable=True)
     chat_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     course_id: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)

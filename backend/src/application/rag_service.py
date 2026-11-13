@@ -12,14 +12,12 @@ from src.schemas.retrieval import (
     InternalCitation,
 )
 
-
 @dataclass(frozen=True)
 class RAGResult:
     answer: str
     citations: list[Citation]
     claims: list[GeneratedClaim] = field(default_factory=list)
     evidence_status: Literal["sufficient", "conflicting", "insufficient"] = "sufficient"
-
 
 class RAGService:
     """Coordinate retrieval, evidence assessment, and grounded generation."""
@@ -38,6 +36,8 @@ class RAGService:
         *,
         question: str,
         course_id: str,
+        user_id: int,
+        source_scope: Literal["documents", "external", "both"] = "both",
         document_ids: list[str] | None = None,
         top_k: int = 5,
         hint_level: int | None = None,
@@ -50,8 +50,10 @@ class RAGService:
         evidence = self._retrieval_service.retrieve(
             query=question,
             course_id=course_id,
+            user_id=user_id,
             document_ids=document_ids,
             top_k=top_k,
+            source_scope=source_scope,
         )
 
         if not evidence:

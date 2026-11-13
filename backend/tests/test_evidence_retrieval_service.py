@@ -8,8 +8,17 @@ from src.schemas.retrieval import ExternalEvidenceSource, InternalEvidenceSource
 
 from src.application.evidence_ranking_service import EvidenceRankingService
 
+
 class FakeDocumentRetrievalService:
-    def retrieve(self, *, query: str, course_id: str, document_ids: list[str] | None = None, top_k: int = 5):
+    def __init__(self):
+        self.last_user_id: int | None = None
+
+    def retrieve(
+        self, *, query: str, course_id: str, user_id: int,
+        document_ids: list[str] | None = None, top_k: int = 5,
+    ):
+        self.last_user_id = user_id
+
         return [
             RetrievedChunk(
                 chunk_id="chunk-1",
@@ -38,11 +47,11 @@ class FakeExternalRetrievalAdapter:
             )
         ]
 
-
 class TestEvidenceRetrievalService(unittest.TestCase):
     def setUp(self):
+        self.document_retrieval = FakeDocumentRetrievalService()
         self.service = EvidenceRetrievalService(
-            FakeDocumentRetrievalService(),
+            self.document_retrieval,
             FakeExternalRetrievalAdapter(),
             EvidenceService(),
             EvidenceRankingService(),
@@ -51,12 +60,13 @@ class TestEvidenceRetrievalService(unittest.TestCase):
     def test_retrieves_internal_and_external_evidence(self):
         results = self.service.retrieve(
             query="virtual memory",
+            user_id=1,
             course_id="CS537",
             top_k=5,
         )
 
         self.assertEqual(len(results), 2)
-
+        self.assertEqual(self.document_retrieval.last_user_id, 1)
         self.assertIsInstance(results[0].source, InternalEvidenceSource)
         self.assertEqual(results[0].text, "Internal course content.")
         self.assertEqual(results[0].source.metadata.document_id, "doc-1")

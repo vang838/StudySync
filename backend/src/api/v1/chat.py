@@ -8,10 +8,10 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from src.api.dependencies import get_assistant_service
+from src.api.dependencies import get_assistant_service, get_current_user
 from src.application.assistant_service import AssistantService
 from src.db.chat_evidence_models import ChatEvidenceAssessmentRecord
-from src.db.models import ChatMessageRecord, ChatThreadRecord
+from src.db.models import ChatMessageRecord, ChatThreadRecord, User
 from src.db.session import get_db
 from src.ports.llm import LLMResponseError, LLMUnavailableError
 from src.schemas.contracts import ChatCreateRequest, ChatCreateResponse, ChatMessage, ChatThread
@@ -61,12 +61,16 @@ def create_chat(
     payload: ChatCreateRequest,
     db: Session = Depends(get_db),
     assistant_service: AssistantService = Depends(get_assistant_service),
+    current_user: User = Depends(get_current_user),
 ) -> ChatCreateResponse:
     try:
         result = assistant_service.generate(
             question=payload.question,
             course_id=payload.course_id,
             hint_level=payload.hint_level,
+            user_id=current_user.user_id,
+            document_ids=payload.document_ids,
+            source_scope=payload.source_scope,
         )
     except LLMUnavailableError as exc:
         raise HTTPException(
@@ -83,6 +87,7 @@ def create_chat(
     chat_id = uuid4().hex
     thread = ChatThreadRecord(
         chat_id=chat_id,
+        user_id=current_user.user_id,
         course_id=payload.course_id,
         question=payload.question,
         answer=result.answer,
@@ -123,11 +128,18 @@ def create_chat(
 
 
 @router.get("/{chat_id}", response_model=ChatThread)
-def get_chat(chat_id: str, db: Session = Depends(get_db)) -> ChatThread:
+def get_chat(
+    chat_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ChatThread:
     statement = (
         select(ChatThreadRecord)
         .options(selectinload(ChatThreadRecord.messages))
-        .where(ChatThreadRecord.chat_id == chat_id)
+        .where(
+            ChatThreadRecord.chat_id == chat_id,
+            ChatThreadRecord.user_id == current_user.user_id,
+        )
     )
     thread = db.scalar(statement)
     if thread is None:
@@ -145,11 +157,18 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)) -> ChatThread:
 
 
 @router.get("/{chat_id}/stream")
-async def stream_chat(chat_id: str, db: Session = Depends(get_db)) -> StreamingResponse:
+async def stream_chat(
+    chat_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StreamingResponse:
     statement = (
         select(ChatThreadRecord)
         .options(selectinload(ChatThreadRecord.messages))
-        .where(ChatThreadRecord.chat_id == chat_id)
+        .where(
+            ChatThreadRecord.chat_id == chat_id,
+            ChatThreadRecord.user_id == current_user.user_id,
+        )
     )
     thread = db.scalar(statement)
     if thread is None:

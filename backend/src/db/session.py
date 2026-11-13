@@ -57,6 +57,22 @@ def init_db() -> None:
     # 1a. Lightweight schema evolution for local dev without migrations.
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
+
+    if "chat_threads" in table_names:
+        column_names = {column["name"] for column in inspector.get_columns("chat_threads")}
+        if "user_id" not in column_names:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE chat_threads ADD COLUMN user_id INTEGER "
+                    "REFERENCES users(user_id) ON DELETE CASCADE"
+                ))
+
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_chat_threads_user_id "
+                "ON chat_threads (user_id)"
+            ))
+
     if "courses" in table_names:
         column_names = {column["name"] for column in inspector.get_columns("courses")}
         if "professor" not in column_names:

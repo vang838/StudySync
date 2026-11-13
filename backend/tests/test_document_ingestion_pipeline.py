@@ -78,6 +78,7 @@ class TestDocumentIngestionPipeline(TestCase):
 
         upload = self.ingestion_service.ingest(
             course_id="cs537",
+            user_id=1,
             title="Operating Systems Notes",
             filename="os-notes.txt",
             declared_media_type="text/plain",

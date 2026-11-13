@@ -1,3 +1,4 @@
+
 from io import BytesIO
 from unittest import TestCase
 from unittest.mock import Mock
@@ -6,8 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.application.document_ingestion_service import DocumentIngestionService, DuplicateDocumentError
 from src.application.docs_upload import DocumentUploadInspection, DocumentUploadInspector
-from src.db.models import DocumentRecord, DocumentVersionRecord, IngestionJobRecord
-
+from src.db.models import DocumentOwnerRecord, DocumentRecord, DocumentVersionRecord, IngestionJobRecord
 
 class FakeObjectStorage:
     def __init__(self):
@@ -62,6 +62,7 @@ class TestDocumentIngestionService(TestCase):
             filename="lecture.pdf",
             declared_media_type="application/pdf",
             fileobj=fileobj,
+            user_id=1,
         )
 
         self.assertEqual(result.course_id, "CS537")
@@ -71,17 +72,23 @@ class TestDocumentIngestionService(TestCase):
         self.assertEqual(len(self.storage.uploaded), 1)
         self.assertEqual(self.storage.uploaded[0]["content"], b"%PDF-1.7\nStudySync")
 
+        
         records = self.db.add_all.call_args.args[0]
 
-        self.assertEqual(len(records), 3)
-        self.assertIsInstance(records[0], DocumentRecord)
-        self.assertIsInstance(records[1], DocumentVersionRecord)
-        self.assertIsInstance(records[2], IngestionJobRecord)
+        self.assertEqual(len(records), 4)
 
-        self.assertFalse(records[0].is_published)
-        self.assertEqual(records[1].file_hash, "a" * 64)
-        self.assertEqual(records[2].status, "queued")
-        self.assertEqual(records[2].current_stage, "uploaded")
+        document = next(record for record in records if isinstance(record, DocumentRecord))
+        version = next(record for record in records if isinstance(record, DocumentVersionRecord))
+        job = next(record for record in records if isinstance(record, IngestionJobRecord))
+        owner = next(record for record in records if isinstance(record, DocumentOwnerRecord))
+
+        self.assertFalse(document.is_published)
+        self.assertEqual(version.file_hash, "a" * 64)
+        self.assertEqual(job.status, "queued")
+        self.assertEqual(job.current_stage, "uploaded")
+
+        self.assertEqual(owner.user_id, 1)
+        self.assertEqual(owner.document_id, document.document_id)
 
         self.db.commit.assert_called_once()
 
@@ -95,6 +102,7 @@ class TestDocumentIngestionService(TestCase):
                 filename="lecture.pdf",
                 declared_media_type="application/pdf",
                 fileobj=BytesIO(b"%PDF-1.7\nStudySync"),
+                user_id=1,
             )
 
         self.assertEqual(self.storage.uploaded, [])
@@ -111,6 +119,7 @@ class TestDocumentIngestionService(TestCase):
                 filename="lecture.pdf",
                 declared_media_type="application/pdf",
                 fileobj=BytesIO(b"%PDF-1.7\nStudySync"),
+                user_id=1,
             )
 
         self.db.rollback.assert_called_once()

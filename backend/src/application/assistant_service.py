@@ -22,12 +22,17 @@ class AssistantService:
         self._llm = llm
         self._rag_service = rag_service
 
-    def generate(self, *, question: str, course_id: str | None = None, hint_level: int | None = None) -> AssistantResult:
+    
+    def generate(
+        self, *, question: str, course_id: str | None = None, hint_level: int | None = None,
+        user_id: int | None = None, document_ids: list[str] | None = None,
+        source_scope: Literal["documents", "external", "both"] = "both",
+    ) -> AssistantResult:
         question = question.strip()
 
-        if not question:
-            raise ValueError("question must not be empty")
+        if not question: raise ValueError("question must not be empty")
 
+        guided_question = question
         if hint_level is not None:
             hint_prompts = {
                 1: "Give only a brief conceptual hint. Do not reveal the answer.",
@@ -36,49 +41,42 @@ class AssistantService:
                 4: "Provide deeper guidance with a detailed explanation and examples.",
             }
 
-            if hint_level not in hint_prompts:
-                raise ValueError("Invalid hint level")
+            if hint_level not in hint_prompts: raise ValueError("Invalid hint level")
 
-            guided_question = (
-                f"{hint_prompts[hint_level]}\n\n"
-                f"Student question: {question}"
-            )
+            guided_question = f"{hint_prompts[hint_level]}\n\nStudent question: {question}"
+
+        if source_scope not in ("documents", "external", "both"):
+            raise ValueError("Invalid source scope")
+
+        if document_ids is not None and source_scope == "external":
+            raise ValueError("Document selection requires document retrieval.")
 
         if not course_id or not course_id.strip():
+            if document_ids is not None or source_scope != "both":
+                raise ValueError("A course must be selected for retrieval.")
+
             return AssistantResult(
-                answer=self._llm.generate(guided_question if hint_level is not None else question),
+                answer=self._llm.generate(guided_question),
                 mode="general",
                 citations=[],
             )
 
-        course_id = course_id.strip()
-        mode = self._classify(question)
+        if user_id is None or user_id <= 0:
+            raise PermissionError("Authentication required for course retrieval.")
 
-        if mode == "course":
-            result = self._rag_service.generate(question=question, course_id=course_id, hint_level=hint_level)
-            return AssistantResult(
-                answer=result.answer,
-                mode="course",
-                citations=result.citations,
-                claims=result.claims,
-                evidence_status=result.evidence_status,
-            )
+        result = self._rag_service.generate(
+            question=question,
+            course_id=course_id.strip(),
+            user_id=user_id,
+            document_ids=document_ids,
+            source_scope=source_scope,
+            hint_level=hint_level,
+        )
 
         return AssistantResult(
-            answer=self._llm.generate(guided_question if hint_level is not None else question),
-            mode="general",
-            citations=[],
+            answer=result.answer,
+            mode="course",
+            citations=result.citations,
+            claims=result.claims,
+            evidence_status=result.evidence_status,
         )
-
-    def _classify(self, question: str) -> Literal["general", "course"]:
-        prompt = (
-            "Classify whether the user's question requires the current course material to answer correctly.\n"
-            "Return exactly COURSE or GENERAL.\n"
-            "COURSE: the question refers to an assignment, problem, lecture, uploaded material, course-specific content, "
-            "or otherwise depends on the current course context.\n"
-            "GENERAL: the question can be answered without using the current course material.\n\n"
-            f"Question:\n{question}"
-        )
-
-        result = self._llm.generate(prompt).strip().upper()
-        return "course" if result == "COURSE" else "general"
