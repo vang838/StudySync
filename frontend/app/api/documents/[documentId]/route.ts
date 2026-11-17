@@ -5,7 +5,7 @@ export async function GET(
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const { documentId } = await params;
   const previewMode = incomingUrl.searchParams.get("preview") === "true";
@@ -54,7 +54,7 @@ export async function DELETE(
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const { documentId } = await params;
   const targetUrl = new URL(
@@ -102,7 +102,7 @@ export async function PATCH(
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const { documentId } = await params;
   const targetUrl = new URL(

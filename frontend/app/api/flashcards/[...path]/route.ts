@@ -5,7 +5,7 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const { path } = await params;
   const encodedPath = path.map(encodeURIComponent).join("/");
@@ -53,7 +53,7 @@ export async function PUT(
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const { path } = await params;
   const encodedPath = path.map(encodeURIComponent).join("/");
@@ -104,7 +104,7 @@ export async function DELETE(
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const { path } = await params;
   const encodedPath = path.map(encodeURIComponent).join("/");
