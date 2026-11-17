@@ -1,11 +1,13 @@
 from collections.abc import Generator
-
+import boto3
 from ollama import Client
 
 from src.core.config import settings
 
 from src.adapters.llm.ollama import OllamaAdapter
 from src.adapters.embedding.ollama import OllamaEmbeddingAdapter
+from src.adapters.llm.openai_compatible import OpenAICompatibleAdapter
+from src.adapters.embedding.cloudflare import CloudflareEmbeddingAdapter
 
 from src.adapters.storage.local import LocalObjectStorageAdapter
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
@@ -21,6 +23,10 @@ from src.application.document_chunker import DocumentChunker
 from src.application.document_chunker_service import DocumentChunkingService
 from src.application.document_embedding_service import DocumentEmbeddingService
 from src.application.document_retrieval_service import DocumentRetrievalService
+from src.application.evidence_ranking_service import EvidenceRankingService
+from src.application.evidence_retrieval_service import EvidenceRetrievalService
+from src.application.evidence_service import EvidenceService
+from src.ports.external_retrieval import ExternalRetrievalPort
 
 from src.db.session import get_db
 
@@ -67,26 +73,39 @@ def get_optional_current_user(
 ) -> User | None:
     user_id = get_session_user_id(studysync_session)
     return db.get(User, user_id) if user_id is not None else None
-from src.application.evidence_ranking_service import EvidenceRankingService
-from src.application.evidence_retrieval_service import EvidenceRetrievalService
-from src.application.evidence_service import EvidenceService
-from src.ports.external_retrieval import ExternalRetrievalPort
-
-import boto3
 
 def get_embedding_port() -> Generator[EmbeddingPort, None, None]:
     """Create configured embedding provider."""
-    if settings.embedding_provider != "ollama":
-        raise RuntimeError(
-            f"Unsupported embedding provider: {settings.embedding_provider}"
-        )
+    if settings.embedding_provider == "ollama":
+        with Client(host=settings.embedding_base_url, timeout=settings.embedding_timeout) as client:
+            yield OllamaEmbeddingAdapter(
+                client=client,
+                model=settings.embedding_model,
+                dimension=settings.embedding_dimension,
+            )
+        return
 
-    with Client(host=settings.embedding_base_url, timeout=settings.embedding_timeout, ) as client:
-        yield OllamaEmbeddingAdapter(
-            client=client,
-            model=settings.embedding_model,
-            dimension=settings.embedding_dimension,
-        )
+    if settings.embedding_provider == "cloudflare":
+        if not settings.embedding_api_key.strip():
+            raise RuntimeError("EMBEDDING_API_KEY is not configured.")
+
+        base_url = settings.embedding_base_url.strip()
+        if not base_url.startswith("https://"):
+            raise RuntimeError("EMBEDDING_BASE_URL must use HTTPS.")
+
+        with httpx.Client(
+            base_url=f"{base_url.rstrip('/')}/",
+            headers={"Authorization": f"Bearer {settings.embedding_api_key}"},
+            timeout=settings.embedding_timeout,
+        ) as client:
+            yield CloudflareEmbeddingAdapter(
+                client=client,
+                model=settings.embedding_model,
+                dimension=settings.embedding_dimension,
+            )
+        return
+
+    raise RuntimeError(f"Unsupported embedding provider: {settings.embedding_provider}")
 
 def get_object_storage() -> ObjectStoragePort:
     provider = settings.object_storage_provider.strip().lower()
@@ -186,11 +205,28 @@ def get_external_retrieval_port() -> Generator[ExternalRetrievalPort, None, None
         yield SearXNGExternalRetrievalAdapter(client=client)
 
 def get_llm_port() -> Generator[LLMPort, None, None]:
-    if settings.ai_provider != "ollama":
-        raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
+    if settings.ai_provider == "ollama":
+        with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
+            yield OllamaAdapter(client=client, model=settings.ai_model)
+        return
 
-    with Client(host=settings.ai_base_url, timeout=settings.ai_timeout) as client:
-        yield OllamaAdapter(client=client, model=settings.ai_model)
+    if settings.ai_provider == "openai_compatible":
+        if not settings.ai_api_key.strip():
+            raise RuntimeError("AI_API_KEY is not configured.")
+
+        base_url = settings.ai_base_url.strip()
+        if not base_url.startswith("https://"):
+            raise RuntimeError("AI_BASE_URL must use HTTPS for hosted inference.")
+
+        with httpx.Client(
+            base_url=f"{base_url.rstrip('/')}/",
+            headers={"Authorization": f"Bearer {settings.ai_api_key}"},
+            timeout=settings.ai_timeout,
+        ) as client:
+            yield OpenAICompatibleAdapter(client=client, model=settings.ai_model)
+        return
+
+    raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
 
 def get_evidence_service() -> EvidenceService:
     return EvidenceService()
