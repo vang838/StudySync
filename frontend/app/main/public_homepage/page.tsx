@@ -1,7 +1,8 @@
+
 import Link from "next/link";
 import Header from "@/components/ui/header";
 import Footer from "@/components/ui/footer";
-import {Button} from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
     Card,
     CardContent,
@@ -9,7 +10,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import {HugeiconsIcon} from "@hugeicons/react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
     ArrowRight01Icon,
     BookOpen01Icon,
@@ -20,15 +21,15 @@ import {
 } from "@hugeicons/core-free-icons";
 
 const features = [
-    {title: "Find your courses", description: "Search courses and save the ones you want to follow.", href: "/courses/course_search", icon: Search01Icon},
-    {title: "Study together", description: "Share notes, ask questions, and learn with your classmates.", href: "/collaborative-hub", icon: CheckmarkCircle01Icon},
-    {title: "Stay organized", description: "Keep study sessions and materials in one focused workspace.", href: "/auth/signin", icon: Calendar03Icon},
+    { title: "Find your courses", description: "Search courses and save the ones you want to follow.", href: "/courses/course_search", icon: Search01Icon },
+    { title: "Study together", description: "Share notes, ask questions, and learn with your classmates.", href: "/collaborative-hub", icon: CheckmarkCircle01Icon },
+    { title: "Stay organized", description: "Keep study sessions and materials in one focused workspace.", href: "/auth/signin", icon: Calendar03Icon },
 ];
 
 export default function PublicHomepage() {
     return (
         <div className="flex min-h-screen flex-col bg-background text-foreground">
-            <Header/>
+            <Header />
             <main className="flex-1 px-6 py-12 md:px-10 md:py-16">
                 <div className="mx-auto flex max-w-6xl flex-col gap-14">
                     <section className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
@@ -43,14 +44,19 @@ export default function PublicHomepage() {
                                 StudySync brings courses, materials, planning, and collaboration together so you can spend less time searching and more time learning.
                             </p>
                             <div className="mt-8 flex flex-wrap gap-3">
-                                <Button asChild size="lg">
-                                    <Link href="/auth/signin">Sign in to your dashboard</Link>
-                                </Button>
-                                <Button asChild variant="outline" size="lg">
-                                    <Link href="/auth/signup">Create an account</Link>
-                                </Button>
+
+                                <div className="mt-8 flex flex-wrap gap-3">
+                                    <Link href="/auth/signin" className={buttonVariants({ size: "xxl" })}>
+                                        Sign in to your dashboard
+                                    </Link>
+                                    <Link href="/auth/signup" className={buttonVariants({ variant: "outline", size: "xxl" })}>
+                                        Create an account
+                                    </Link>
+                                </div>
+
                             </div>
                         </div>
+
                         <Card className="border-secondary/20 bg-card shadow-sm">
                             <CardHeader>
                                 <p className="text-xs font-semibold uppercase tracking-widest text-secondary">A snapshot of your day</p>
@@ -72,7 +78,7 @@ export default function PublicHomepage() {
                                             <span className="text-sm font-semibold">{progress}</span>
                                         </div>
                                         <div className="mt-3 h-2 rounded-full bg-muted">
-                                            <div className="h-2 rounded-full bg-secondary" style={{width: progress}}/>
+                                            <div className="h-2 rounded-full bg-secondary" style={{ width: progress }} />
                                         </div>
                                     </div>
                                 ))}
@@ -91,14 +97,14 @@ export default function PublicHomepage() {
                                     <Card className="h-full transition group-hover:-translate-y-0.5 group-hover:border-secondary group-hover:shadow-sm">
                                         <CardContent className="flex h-full flex-col gap-4 p-6">
                                             <span className="flex size-11 items-center justify-center rounded-xl bg-background text-secondary">
-                                                <HugeiconsIcon icon={feature.icon} size={22}/>
+                                                <HugeiconsIcon icon={feature.icon} size={22} />
                                             </span>
                                             <div className="flex-1">
                                                 <CardTitle className="text-lg">{feature.title}</CardTitle>
                                                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{feature.description}</p>
                                             </div>
                                             <span className="flex items-center gap-1 text-sm font-semibold text-secondary">
-                                                Explore <HugeiconsIcon icon={ArrowRight01Icon} size={16}/>
+                                                Explore <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
                                             </span>
                                         </CardContent>
                                     </Card>
@@ -108,13 +114,13 @@ export default function PublicHomepage() {
                     </section>
 
                     <section className="grid gap-4 sm:grid-cols-3">
-                        {[
+                        {([
                             ["3", "Saved courses", BookOpen01Icon],
                             ["3", "Recent uploads", FileTextIcon],
                             ["5", "Upcoming tasks", CheckmarkCircle01Icon],
-                        ].map(([value, label, icon]) => (
-                            <div key={label as string} className="flex items-center gap-4 rounded-xl border border-foreground/10 bg-card p-5">
-                                <HugeiconsIcon icon={icon} size={22} className="text-secondary"/>
+                        ] as const).map(([value, label, icon]) => (
+                            <div key={label} className="flex items-center gap-4 rounded-xl border border-foreground/10 bg-card p-5">
+                                <HugeiconsIcon icon={icon} size={22} className="text-secondary" />
                                 <div>
                                     <p className="text-2xl font-bold">{value}</p>
                                     <p className="text-sm text-muted-foreground">{label}</p>
@@ -124,7 +130,7 @@ export default function PublicHomepage() {
                     </section>
                 </div>
             </main>
-            <Footer/>
+            <Footer />
         </div>
     );
 }
