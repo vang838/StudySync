@@ -4,7 +4,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
+  const backendBaseUrl = process.env.API_BASE_URL ?? 'http://127.0.0.1:8000';
   const incomingUrl = new URL(request.url);
   const { userId } = await params;
   const targetUrl = new URL(`/api/v1/users/${encodeURIComponent(userId)}`, backendBaseUrl);
@@ -47,7 +47,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
+  const backendBaseUrl = process.env.API_BASE_URL ?? 'http://127.0.0.1:8000';
   const { userId } = await params;
   const targetUrl = new URL(`/api/v1/users/${encodeURIComponent(userId)}`, backendBaseUrl);
   const controller = new AbortController();

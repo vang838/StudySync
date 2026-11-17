@@ -5,7 +5,7 @@ export async function GET(
   { params }: { params: Promise<{ publicId: string }> },
 ) {
   const { publicId } = await params;
-  const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+  const backendBaseUrl = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const targetUrl = new URL(`/api/v1/users/public/${encodeURIComponent(publicId)}`, backendBaseUrl);
   try {
     const response = await fetch(targetUrl, { cache: "no-store" });
