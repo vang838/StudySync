@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
+  const backendBaseUrl = process.env.API_BASE_URL ?? 'http://127.0.0.1:8000';
   const targetUrl = new URL('/api/v1/courses/subjects', backendBaseUrl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);

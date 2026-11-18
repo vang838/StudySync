@@ -1,5 +1,5 @@
 from collections.abc import Generator
-
+import boto3
 from ollama import Client
 
 from src.core.config import settings
@@ -23,6 +23,10 @@ from src.application.document_chunker import DocumentChunker
 from src.application.document_chunker_service import DocumentChunkingService
 from src.application.document_embedding_service import DocumentEmbeddingService
 from src.application.document_retrieval_service import DocumentRetrievalService
+from src.application.evidence_ranking_service import EvidenceRankingService
+from src.application.evidence_retrieval_service import EvidenceRetrievalService
+from src.application.evidence_service import EvidenceService
+from src.ports.external_retrieval import ExternalRetrievalPort
 
 from src.db.session import get_db
 

@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: studysync-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-studysync}
+      POSTGRES_USER: ${POSTGRES_USER:-studysync}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+    ports:
+      - "127.0.0.1:5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-studysync} -d ${POSTGRES_DB:-studysync}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: studysync-searxng
+    restart: unless-stopped
+
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?SEARXNG_SECRET is required}
+
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    volumes:
+      - ./infra/searxng:/etc/searxng
+      - searxng_cache:/var/cache/searxng
+
+  backend:
+    image: studysync-backend:latest
+    build: ./backend
+    container_name: studysync-backend
+    restart: unless-stopped
+
+    env_file:
+      - /etc/studysync/.env
+      - /etc/studysync/.env.ai.groq
+      - /etc/studysync/.env.embedding.cloudflare
+
+    environment:
+      EXTERNAL_RETRIEVAL_BASE_URL: http://searxng:8080
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    image: studysync-frontend:latest
+    build: ./frontend
+    container_name: studysync-frontend
+    restart: unless-stopped
+
+    environment:
+      API_BASE_URL: http://backend:8000
+
+    depends_on:
+      - backend
+
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  postgres_data:
+    name: studysync-postgres-data
+
+  searxng_cache:
+    name: studysync-searxng-cache

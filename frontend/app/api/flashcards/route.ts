@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const targetUrl = new URL("/api/v1/flashcard-sets", backendBaseUrl);
   const controller = new AbortController();
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const backendBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+    process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const targetUrl = new URL("/api/v1/flashcard-sets", backendBaseUrl);
   const controller = new AbortController();

@@ -5,7 +5,7 @@ async function proxyForumBookmarkMutation(
   params: Promise<{ courseId: string; postId: string }>,
   method: "POST" | "DELETE",
 ) {
-  const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+  const backendBaseUrl = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const incomingUrl = new URL(request.url);
   const { courseId, postId } = await params;
   const normalizedCourseId = decodeURIComponent(courseId);
