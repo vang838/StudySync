@@ -9,6 +9,7 @@ from src.api.v1.health import router as health_router
 from src.api.v1.professor_reviews import router as professor_reviews_router
 from src.api.v1.sources import router as sources_router
 from src.api.v1.users import router as users_router
+from src.api.v1.notifications import router as notifications_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
@@ -20,3 +21,4 @@ api_router.include_router(chat_router)
 api_router.include_router(sources_router)
 api_router.include_router(professor_reviews_router)
 api_router.include_router(flashcards_router)
+api_router.include_router(notifications_router)
