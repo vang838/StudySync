@@ -167,7 +167,7 @@ function AssistantMessageContent({ message }: { message: ChatMessage }) {
 export default function AssistantWidget() {
   const pathname = usePathname();
   const params = useParams<{ courseId?: string }>();
-  const courseId = params.courseId;
+  const courseId = params.courseId ? decodeURIComponent(params.courseId) : undefined;
 
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
@@ -364,8 +364,8 @@ export default function AssistantWidget() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-      },
-      body: JSON.stringify({
+        },
+        body: JSON.stringify({
           question: activeQuestion,
           hint_level: nextLevel,
           ...(activeCourseId ? { course_id: activeCourseId } : {}),
@@ -474,8 +474,8 @@ export default function AssistantWidget() {
                 <div
                   key={message.id}
                   className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${message.role === "user"
-                      ? "ml-auto bg-primary text-primary-foreground"
-                      : "mr-auto bg-muted"
+                    ? "ml-auto bg-primary text-primary-foreground"
+                    : "mr-auto bg-muted"
                     }`}
                 >
                   {message.evidenceStatus === "conflicting" && (

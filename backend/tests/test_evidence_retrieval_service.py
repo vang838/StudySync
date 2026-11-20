@@ -1,16 +1,21 @@
-import unittest
 
-from src.application.document_retrieval_service import RetrievedChunk
+import unittest
+from unittest.mock import Mock
+
+from src.application.document_retrieval_service import DocumentRetrievalService, RetrievedChunk
+from src.application.evidence_ranking_service import EvidenceRankingService
 from src.application.evidence_retrieval_service import EvidenceRetrievalService
 from src.application.evidence_service import EvidenceService
-from src.ports.external_retrieval import ExternalRetrievalResult
+from src.ports.external_retrieval import ExternalRetrievalPort, ExternalRetrievalResult
 from src.schemas.retrieval import ExternalEvidenceSource, InternalEvidenceSource
 
-from src.application.evidence_ranking_service import EvidenceRankingService
 
-class FakeDocumentRetrievalService:
-    def retrieve(self, *, query: str, course_id: str, document_ids: list[str] | None = None, top_k: int = 5):
-        return [
+class TestEvidenceRetrievalService(unittest.TestCase):
+    def setUp(self):
+        self.documents = Mock(spec=DocumentRetrievalService)
+        self.external = Mock(spec=ExternalRetrievalPort)
+
+        self.documents.retrieve.return_value = [
             RetrievedChunk(
                 chunk_id="chunk-1",
                 text="Internal course content.",
@@ -19,16 +24,13 @@ class FakeDocumentRetrievalService:
                     "document_id": "doc-1",
                     "version_id": "version-1",
                     "chunk_id": "chunk-1",
-                    "course_id": course_id,
+                    "course_id": "CS537",
                     "chunk_index": 0,
                 },
             )
         ]
 
-
-class FakeExternalRetrievalAdapter:
-    def search(self, query: str, top_k: int = 5):
-        return [
+        self.external.search.return_value = [
             ExternalRetrievalResult(
                 text="External reference content.",
                 provider="searxng",
@@ -38,36 +40,95 @@ class FakeExternalRetrievalAdapter:
             )
         ]
 
-
-class TestEvidenceRetrievalService(unittest.TestCase):
-    def setUp(self):
         self.service = EvidenceRetrievalService(
-            FakeDocumentRetrievalService(),
-            FakeExternalRetrievalAdapter(),
+            self.documents,
+            self.external,
             EvidenceService(),
             EvidenceRankingService(),
         )
 
-    def test_retrieves_internal_and_external_evidence(self):
+    def test_defaults_to_internal_only(self):
+        results = self.service.retrieve(query="virtual memory", course_id="CS537")
+
+        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results[0].source, InternalEvidenceSource)
+        self.assertEqual(results[0].source.metadata.course_id, "CS537")
+        self.assertEqual(results[0].source.metadata.document_id, "doc-1")
+        self.assertIsNotNone(results[0].rank_score)
+        self.external.search.assert_not_called()
+
+    def test_external_fallback_skipped_when_internal_exists(self):
         results = self.service.retrieve(
             query="virtual memory",
             course_id="CS537",
-            top_k=5,
+            source_policy="external_fallback",
         )
 
-        self.assertEqual(len(results), 2)
-
+        self.assertEqual(len(results), 1)
         self.assertIsInstance(results[0].source, InternalEvidenceSource)
-        self.assertEqual(results[0].text, "Internal course content.")
-        self.assertEqual(results[0].source.metadata.document_id, "doc-1")
+        self.external.search.assert_not_called()
 
-        self.assertIsInstance(results[1].source, ExternalEvidenceSource)
-        self.assertEqual(results[1].text, "External reference content.")
-        self.assertEqual(results[1].source.provider, "searxng")
-        self.assertEqual(results[1].source.url, "https://example.com/reference")
+    def test_external_fallback_when_internal_is_empty(self):
+        self.documents.retrieve.return_value = []
 
-        self.assertIsNotNone(results[0].rank_score)
-        self.assertIsNotNone(results[1].rank_score)
+        results = self.service.retrieve(
+            query="virtual memory",
+            course_id="CS537",
+            source_policy="external_fallback",
+        )
 
-if __name__ == "__main__":
-    unittest.main()
+        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results[0].source, ExternalEvidenceSource)
+        self.assertEqual(results[0].source.provider, "searxng")
+        self.external.search.assert_called_once_with("virtual memory", top_k=5)
+
+    def test_document_scoped_fallback_never_uses_external(self):
+        self.documents.retrieve.return_value = []
+
+        results = self.service.retrieve(
+            query="lecture notes",
+            course_id="CS537",
+            document_ids=["doc-1"],
+            source_policy="external_fallback",
+        )
+
+        self.assertEqual(results, [])
+        self.documents.retrieve.assert_called_once_with(
+            query="lecture notes",
+            course_id="CS537",
+            document_ids=["doc-1"],
+            top_k=5,
+        )
+        self.external.search.assert_not_called()
+
+    def test_explicit_external_only_skips_internal(self):
+        results = self.service.retrieve(
+            query="recent research",
+            course_id="CS537",
+            source_policy="external_only",
+        )
+
+        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results[0].source, ExternalEvidenceSource)
+        self.documents.retrieve.assert_not_called()
+        self.external.search.assert_called_once_with("recent research", top_k=5)
+
+    def test_external_only_rejects_document_scope(self):
+        with self.assertRaises(ValueError):
+            self.service.retrieve(
+                query="lecture notes",
+                course_id="CS537",
+                document_ids=["doc-1"],
+                source_policy="external_only",
+            )
+
+        self.documents.retrieve.assert_not_called()
+        self.external.search.assert_not_called()
+
+    def test_rejects_invalid_policy(self):
+        with self.assertRaises(ValueError):
+            self.service.retrieve(
+                query="virtual memory",
+                course_id="CS537",
+                source_policy="invalid",
+            )

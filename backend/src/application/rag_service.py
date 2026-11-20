@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from src.application.evidence_analysis_service import EvidenceAnalysisService
-from src.application.evidence_retrieval_service import EvidenceRetrievalService
+from src.application.evidence_retrieval_service import EvidenceRetrievalService, SourcePolicy
 from src.ports.llm import LLMPort
 from src.schemas.retrieval import (
     Citation,
@@ -33,6 +33,7 @@ class RAGService:
         self._retrieval_service = retrieval_service
         self._analysis_service = analysis_service or EvidenceAnalysisService(llm)
 
+
     def generate(
         self,
         *,
@@ -41,17 +42,17 @@ class RAGService:
         document_ids: list[str] | None = None,
         top_k: int = 5,
         hint_level: int | None = None,
+        source_policy: SourcePolicy = "internal_only",
     ) -> RAGResult:
         question = question.strip()
-
-        if not question:
-            raise ValueError("question must not be empty")
+        if not question: raise ValueError("question must not be empty")
 
         evidence = self._retrieval_service.retrieve(
             query=question,
             course_id=course_id,
             document_ids=document_ids,
             top_k=top_k,
+            source_policy=source_policy,
         )
 
         if not evidence:
@@ -62,11 +63,7 @@ class RAGService:
             )
 
         analysis = self._analysis_service.generate(question=question, evidence=evidence, hint_level=hint_level)
-        citations = (
-            []
-            if analysis.status == "insufficient"
-            else self._citations_from_claims(evidence, analysis.claims)
-        )
+        citations = [] if analysis.status == "insufficient" else self._citations_from_claims(evidence, analysis.claims)
 
         return RAGResult(
             answer=analysis.answer,
