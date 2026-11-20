@@ -55,7 +55,11 @@ def resetpassword(payload: PasswordResetRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
+def login(
+    payload: AuthLoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
 
     email = str(payload.email).strip().lower()
     existing_user = db.scalar(select(User).where(User.user_email == email))
@@ -67,10 +71,19 @@ def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
         )
+    token = create_session_token(existing_user.user_id)
+
+    response.set_cookie(
+        key="studysync_session",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # Local HTTP development only
+    )
 
     return {
         "message": "Login successful.",
-        "access_token": create_session_token(existing_user.user_id),
+        "access_token": token,
         "user": {
             "user_id": existing_user.user_id,
             "public_id": existing_user.public_id,
