@@ -6,6 +6,8 @@ from src.application.rag_service import RAGService
 from src.ports.llm import LLMPort
 from src.ports.course_repository import CourseMetadata, CourseRepositoryPort
 
+from src.application.evidence_retrieval_service import SourcePolicy
+
 from src.schemas.retrieval import Citation, GeneratedClaim
 
 CourseIntent = Literal["general", "course", "description", "instructor", "title", "subject", "year"]
@@ -40,6 +42,18 @@ class AssistantService:
         "what subject is this course": "subject",
         "what year is this course": "year",
     }
+
+    _EXTERNAL_REQUEST_PREFIXES = (
+        "search the web",
+        "please search the web",
+        "can you search the web",
+        "could you search the web",
+        "look online",
+        "please look online",
+        "find online sources",
+        "find external sources",
+        "use external sources",
+    )
 
     def __init__(self, llm: LLMPort, rag_service: RAGService, course_repository: CourseRepositoryPort) -> None:
         self._llm = llm
@@ -76,7 +90,13 @@ class AssistantService:
             course_id = course_context.course_id
 
         normalized_question = " ".join(question.casefold().strip(" ?!.").split())
-        intent = self._METADATA_QUESTIONS.get(normalized_question)
+        source_policy: SourcePolicy = (
+            "external_only"
+            if question.casefold().strip().startswith(self._EXTERNAL_REQUEST_PREFIXES)
+            else "internal_only"
+        )
+
+        intent = "course" if source_policy == "external_only" else self._METADATA_QUESTIONS.get(normalized_question)
         if intent is None:
             intent = self._classify(question, course_context)
 
@@ -89,7 +109,12 @@ class AssistantService:
             return AssistantResult(answer=answer, mode="course", citations=[])
 
         if intent == "course":
-            result = self._rag_service.generate(question=question, course_id=course_id, hint_level=hint_level)
+            result = self._rag_service.generate(
+                question=question,
+                course_id=course_id,
+                hint_level=hint_level,
+                source_policy=source_policy,
+            )
             return AssistantResult(
                 answer=result.answer,
                 mode="course",

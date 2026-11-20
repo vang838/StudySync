@@ -91,7 +91,9 @@ class TestRAGService(TestCase):
             course_id="cs101",
             document_ids=["doc-1"],
             top_k=3,
+            source_policy="internal_only",
         )
+
         prompt = self.llm.generate.call_args.args[0]
         self.assertIn('"evidence_id": "internal:chunk-1"', prompt)
         self.assertIn("Question:\nWhat does TCP provide?", prompt)
@@ -127,6 +129,22 @@ class TestRAGService(TestCase):
         self.assertEqual(result.evidence_status, "insufficient")
         self.llm.generate.assert_not_called()
 
+    def test_forwards_explicit_source_policy(self) -> None:
+        self.retrieval_service.retrieve.return_value = []
+
+        self.service.generate(
+            question="Find online references about TCP.",
+            course_id="CS537",
+            source_policy="external_only",
+        )
+
+        self.retrieval_service.retrieve.assert_called_once_with(
+            query="Find online references about TCP.",
+            course_id="CS537",
+            document_ids=None,
+            top_k=5,
+            source_policy="external_only",
+        )
 
 if __name__ == "__main__":
     import unittest
