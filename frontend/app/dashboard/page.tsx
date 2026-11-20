@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import {useSyncExternalStore} from "react";
 import {useEffect, useState} from "react";
 import {HugeiconsIcon} from "@hugeicons/react";
 import {
@@ -22,85 +21,24 @@ import {
 import StudyCalendar from "@/components/dashboard/StudyCalendar";
 import {useStudyTasks} from "@/components/dashboard/StudyTasksProvider";
 
-const courses = [
-    {code: "BIO 201", name: "Human Biology", progress: 72},
-    {
-        code: "MATH 240",
-        name: "Statistics & Probability",
-        progress: 48,
-    },
-    {code: "HIST 108", name: "World History", progress: 85},
-];
+type SavedCourse = {
+    course_id: string;
+    title: string;
+    professor: string;
+    is_archived: boolean;
+};
 
-let cachedSavedCoursesRaw: string | null = null;
-let cachedSavedCoursesSnapshot = courses;
 
-function getSavedCoursesSnapshot() {
-    if (typeof window === "undefined") {
-        return courses;
-    }
-
-    try {
-        const raw = window.localStorage.getItem("saved_courses");
-        if (!raw) {
-            return courses;
-        }
-
-        if (raw === cachedSavedCoursesRaw) {
-            return cachedSavedCoursesSnapshot;
-        }
-
-        const parsedCourses = JSON.parse(raw);
-        if (Array.isArray(parsedCourses) && parsedCourses.length > 0) {
-            cachedSavedCoursesRaw = raw;
-            cachedSavedCoursesSnapshot = parsedCourses;
-            return cachedSavedCoursesSnapshot;
-        }
-    } catch (error) {
-        console.warn("Unable to load saved courses from localStorage.", error);
-    }
-
-    cachedSavedCoursesRaw = null;
-    cachedSavedCoursesSnapshot = courses;
-    return courses;
-}
-
-function subscribeToSavedCourses(onStoreChange: () => void) {
-    if (typeof window === "undefined") {
-        return () => {
-        };
-    }
-
-    const handleStorageChange = (event: StorageEvent) => {
-        if (!event.key || event.key === "saved_courses") {
-            onStoreChange();
-        }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-        window.removeEventListener("storage", handleStorageChange);
-    };
-}
-
-const uploads = [
-    {
-        name: "Cell Structure Lecture.pdf",
-        course: "Human Biology",
-        date: "Sep 22",
-    },
-    {
-        name: "Chapter 4 Notes.pdf",
-        course: "Statistics & Probability",
-        date: "Sep 20",
-    },
-    {
-        name: "Industrial Revolution.docx",
-        course: "World History",
-        date: "Sep 18",
-    },
-];
+type UploadedDocument = {
+    document_id: string;
+    version_id: string;
+    course_id: string;
+    title: string;
+    original_filename: string;
+    file_size_bytes: number;
+    created_at: string;
+    is_published: boolean;
+};
 
 const quickActions = [
     {
@@ -158,18 +96,83 @@ export default function StudentDashboardPage() {
         .sort((first, second) => first.dueDate.localeCompare(second.dueDate))
         .slice(0, 5);
 
-    const savedCourses = useSyncExternalStore(
-        subscribeToSavedCourses,
-        getSavedCoursesSnapshot,
-        () => courses
-    );
 
-    const averageProgress = Math.round(
-        savedCourses.reduce(
-            (total, course) => total + course.progress,
-            0
-        ) / savedCourses.length
-    );
+    const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
+    const [coursesLoading, setCoursesLoading] = useState(true);
+    const [coursesError, setCoursesError] = useState("");
+
+
+    const [uploads, setUploads] = useState<UploadedDocument[]>([]);
+    const [uploadsLoading, setUploadsLoading] = useState(true);
+    const [uploadsError, setUploadsError] = useState("");
+
+    useEffect(() => {
+        async function loadUploads() {
+            try {
+                const response = await fetch(
+                    "/api/documents?published_only=false",
+                    {cache: "no-store"}
+                );
+
+                if (!response.ok) {
+                    throw new Error("Unable to load uploads.");
+                }
+
+                const data: UploadedDocument[] = await response.json();
+
+                setUploads(data);
+
+            } catch (error) {
+                setUploadsError(
+                    error instanceof Error
+                        ? error.message
+                        : "Something went wrong."
+                );
+            } finally {
+                setUploadsLoading(false);
+            }
+        }
+
+        loadUploads();
+    }, []);
+
+
+    useEffect(() => {
+        async function loadCourses() {
+            try {
+                const userId = localStorage.getItem("user_id");
+
+                if (!userId) {
+                    throw new Error("Please sign in.");
+                }
+
+                const response = await fetch(
+                    `/api/courses/saved?user_id=${encodeURIComponent(userId)}`,
+                    {cache: "no-store"}
+                );
+
+                if (!response.ok) {
+                    throw new Error("Unable to retrieve saved courses.");
+                }
+
+                const data: SavedCourse[] = await response.json();
+
+                setSavedCourses(data);
+
+            } catch (error) {
+                setCoursesError(
+                    error instanceof Error
+                        ? error.message
+                        : "Something went wrong."
+                );
+            } finally {
+                setCoursesLoading(false);
+            }
+        }
+
+        loadCourses();
+    }, []);
+
 
     useEffect(() => {
         const userId = localStorage.getItem("user_id");
@@ -182,7 +185,7 @@ export default function StudentDashboardPage() {
                 if (!response.ok) {
                     throw new Error("Unable to load account security status.");
                 }
-                return response.json() as Promise<{password_needs_update?: boolean}>;
+                return response.json() as Promise<{ password_needs_update?: boolean }>;
             })
             .then((user) => {
                 setCurrentUserId(userId);
@@ -217,7 +220,8 @@ export default function StudentDashboardPage() {
                 </div>
 
                 {passwordNeedsUpdate && showPasswordBanner && (
-                    <div className="relative rounded-md border border-amber-300 bg-amber-50 px-4 py-3 pr-10 text-sm text-amber-950">
+                    <div
+                        className="relative rounded-md border border-amber-300 bg-amber-50 px-4 py-3 pr-10 text-sm text-amber-950">
                         <button
                             type="button"
                             onClick={() => setShowPasswordBanner(false)}
@@ -286,17 +290,26 @@ export default function StudentDashboardPage() {
                         {[
                             {
                                 label: "Saved courses",
-                                value: String(savedCourses.length),
+                                value: coursesLoading
+                                    ? "..."
+                                    : coursesError
+                                        ? "N/A"
+                                        : String(savedCourses.length),
                                 icon: BookOpen01Icon,
                             },
                             {
                                 label: "Recent uploads",
-                                value: String(uploads.length),
+                                value: uploadsLoading
+                                    ? "..."
+                                    : uploadsError
+                                        ? "N/A"
+                                        : String(new Set(uploads.map(upload => upload.document_id)).size),
                                 icon: FileTextIcon,
                             },
+
                             {
                                 label: "Average progress",
-                                value: averageProgress + "%",
+                                value: "N/A",
                                 icon: Clock01Icon,
                             },
                         ].map((stat) => (
@@ -324,61 +337,108 @@ export default function StudentDashboardPage() {
 
                 <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="flex min-w-0 flex-col gap-8">
-                        <section id="courses" className="scroll-mt-5">
-                            <SectionHeading
-                                eyebrow="Keep learning"
-                                title="Saved & recent courses"
-                            />
 
-                            <div className="grid gap-4 md:grid-cols-3">
-                                {savedCourses.map((course) => (
-                                    <Link
-                                        key={course.code}
-                                        href={`/courses/${encodeURIComponent(course.code)}`}
-                                        className="block"
-                                    >
-                                        <Card
-                                            size="sm"
-                                            className="gap-0"
-                                        >
+
+                        <section id="courses" className="scroll-mt-5">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <SectionHeading
+                                    eyebrow="Learn together"
+                                    title="My Courses & Collaboration"
+                                />
+
+                                <Link
+                                    href="/courses/course_search"
+                                    className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:opacity-90"
+                                >
+                                    Browse Courses
+                                </Link>
+                            </div>
+
+                            <p className="mb-4 text-sm text-muted-foreground">
+                                Access your courses, explore shared materials,
+                                and collaborate with classmates.
+                            </p>
+
+                            {coursesLoading && (
+                                <p>Loading your courses...</p>
+                            )}
+
+                            {coursesError && (
+                                <p className="text-red-500">{coursesError}</p>
+                            )}
+
+                            {!coursesLoading && !coursesError && savedCourses.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    You have not saved any courses yet.
+                                    Browse the course catalog to get started.
+                                </p>
+                            )}
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {savedCourses.map((course) => {
+                                    const courseUrl =
+                                        `/courses/${encodeURIComponent(course.course_id)}`;
+
+                                    return (
+                                        <Card key={course.course_id} className="gap-3">
                                             <CardHeader>
                                                 <p className="text-xs font-semibold text-secondary">
-                                                    {course.code}
+                                                    {course.course_id}
                                                 </p>
-                                                <CardTitle className="text-sm">
-                                                    {course.name}
+
+                                                <CardTitle className="text-base">
+                                                    {course.title}
                                                 </CardTitle>
+
+                                                <p className="text-xs text-muted-foreground">
+                                                    {course.professor || "Professor not listed"}
+                                                </p>
                                             </CardHeader>
 
-                                            <CardContent>
-                                                <div className="flex justify-between text-xs text-muted-foreground">
-                                                    <span>Sample progress</span>
-                                                    <span>{course.progress}%</span>
-                                                </div>
+                                            <CardContent className="space-y-3">
+                                                <p className="text-xs text-muted-foreground">
+                                                    Connect with classmates, join discussions,
+                                                    and explore course materials.
+                                                </p>
 
-                                                <div
-                                                    className="mt-2 h-2 overflow-hidden rounded-full bg-background"
-                                                    role="progressbar"
-                                                    aria-label={
-                                                        course.name + " progress"
-                                                    }
-                                                    aria-valuenow={course.progress}
-                                                    aria-valuemin={0}
-                                                    aria-valuemax={100}
-                                                >
-                                                    <div
-                                                        className="h-full rounded-full bg-secondary"
-                                                        style={{
-                                                            width: course.progress + "%",
-                                                        }}
-                                                    />
+                                                <div className="flex flex-col gap-2">
+                                                    <Link
+                                                        href={`${courseUrl}#course-discussions`}
+                                                        className="rounded-md bg-secondary px-3 py-2 text-center text-sm font-medium text-secondary-foreground hover:opacity-90"
+                                                    >
+                                                        Course Discussions
+                                                    </Link>
+
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <Link
+                                                            href={`${courseUrl}#course-materials`}
+                                                            className="rounded-md border border-foreground/10 px-3 py-2 text-center text-xs hover:bg-muted"
+                                                        >
+                                                            Materials
+                                                        </Link>
+
+                                                        <Link
+                                                            href={`${courseUrl}#course-members`}
+                                                            className="rounded-md border border-foreground/10 px-3 py-2 text-center text-xs hover:bg-muted"
+                                                        >
+                                                            Classmates
+                                                        </Link>
+                                                    </div>
+
+                                                    <Link
+                                                        href={courseUrl}
+                                                        className="text-center text-xs text-muted-foreground hover:underline"
+                                                    >
+                                                        View Course Overview
+                                                    </Link>
                                                 </div>
                                             </CardContent>
                                         </Card>
-                                    </Link>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </section>
+
 
                         <section id="uploads" className="scroll-mt-5">
                             <SectionHeading
@@ -388,36 +448,67 @@ export default function StudentDashboardPage() {
 
                             <Card className="gap-0">
                                 <CardContent className="divide-y divide-foreground/10">
-                                    {uploads.map((upload) => (
-                                        <div
-                                            key={upload.name}
-                                            className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                                        >
-                      <span
-                          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-secondary">
-                        <HugeiconsIcon
-                            icon={FileTextIcon}
-                            size={18}
-                        />
-                      </span>
 
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate font-medium">
-                                                    {upload.name}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {upload.course}
-                                                </p>
+                                    {uploadsLoading && (
+                                        <p>Loading uploads...</p>
+                                    )}
+
+                                    {uploadsError && (
+                                        <p className="text-red-500">{uploadsError}</p>
+                                    )}
+
+                                    {!uploadsLoading && !uploadsError && uploads.length === 0 && (
+                                        <p className="text-sm text-muted-foreground">
+                                            No documents uploaded yet.
+                                        </p>
+                                    )}
+
+                                    {[...uploads]
+                                        .sort((a, b) =>
+                                            new Date(b.created_at).getTime() -
+                                            new Date(a.created_at).getTime()
+                                        )
+                                        .filter((upload, index, all) =>
+                                            all.findIndex(item =>
+                                                item.document_id === upload.document_id
+                                            ) === index
+                                        )
+                                        .slice(0, 5)
+                                        .map((upload) => (
+                                            <div
+                                                key={upload.document_id}
+                                                className="flex items-center gap-3 py-3"
+                                            >
+                        <span
+                            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-secondary">
+                            <HugeiconsIcon
+                                icon={FileTextIcon}
+                                size={18}
+                            />
+                        </span>
+
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate font-medium">
+                                                        {upload.original_filename}
+                                                    </p>
+
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {upload.course_id}
+                                                    </p>
+                                                </div>
+
+                                                <time className="text-xs text-muted-foreground">
+                                                    {new Date(upload.created_at).toLocaleDateString(undefined, {
+                                                        month: "short",
+                                                        day: "numeric",
+                                                    })}
+                                                </time>
                                             </div>
-
-                                            <time className="shrink-0 text-xs text-muted-foreground">
-                                                {upload.date}
-                                            </time>
-                                        </div>
-                                    ))}
+                                        ))}
                                 </CardContent>
                             </Card>
                         </section>
+
 
                         <section id="tasks" className="scroll-mt-5">
                             <SectionHeading
@@ -488,5 +579,6 @@ export default function StudentDashboardPage() {
                 </div>
             </div>
         </main>
-    );
+    )
+        ;
 }
