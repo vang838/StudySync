@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 
 async function proxyForumBookmarkMutation(
@@ -26,6 +27,7 @@ async function proxyForumBookmarkMutation(
       method,
       headers: {
         accept: "application/json",
+        cookie: request.headers.get("cookie") ?? "",
       },
       signal: controller.signal,
       cache: "no-store",

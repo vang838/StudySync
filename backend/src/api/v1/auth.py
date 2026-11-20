@@ -12,8 +12,9 @@ from src.schemas.contracts import (
 )
 from src.core.security import create_session_token, hash_password, verify_password
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+from src.api.dependencies import get_current_user
 
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/forgotpassword")
 def forgotpassword(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
@@ -23,7 +24,6 @@ def forgotpassword(payload: ForgotPasswordRequest, db: Session = Depends(get_db)
     return {
         "message": "If an account exists for this email, a password reset link has been sent."
     }
-
 
 @router.post("/resetpassword")
 def resetpassword(payload: PasswordResetRequest, db: Session = Depends(get_db)):
@@ -132,3 +132,7 @@ def signup(
 def logout(response: Response) -> None:
     response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key="refresh_token", path="/")
+
+@router.get("/me")
+def get_authenticated_user(current_user: User = Depends(get_current_user)) -> dict:
+    return {"user_id": current_user.user_id}

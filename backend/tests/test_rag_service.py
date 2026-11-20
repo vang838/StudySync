@@ -2,6 +2,7 @@ import json
 from unittest import TestCase
 from unittest.mock import Mock
 
+from src.application.evidence_relevance_service import EvidenceRelevanceService
 from src.application.evidence_retrieval_service import EvidenceRetrievalService
 from src.application.rag_service import RAGService
 from src.ports.llm import LLMPort
@@ -91,7 +92,9 @@ class TestRAGService(TestCase):
             course_id="cs101",
             document_ids=["doc-1"],
             top_k=3,
+            source_policy="internal_only",
         )
+
         prompt = self.llm.generate.call_args.args[0]
         self.assertIn('"evidence_id": "internal:chunk-1"', prompt)
         self.assertIn("Question:\nWhat does TCP provide?", prompt)
@@ -127,6 +130,174 @@ class TestRAGService(TestCase):
         self.assertEqual(result.evidence_status, "insufficient")
         self.llm.generate.assert_not_called()
 
+    def test_forwards_explicit_source_policy(self) -> None:
+        self.retrieval_service.retrieve.return_value = []
+
+        self.service.generate(
+            question="Find online references about TCP.",
+            course_id="CS537",
+            source_policy="external_only",
+        )
+
+        self.retrieval_service.retrieve.assert_called_once_with(
+            query="Find online references about TCP.",
+            course_id="CS537",
+            document_ids=None,
+            top_k=5,
+            source_policy="external_only",
+        )
+
+    def test_uses_contextual_retrieval_query(self) -> None:
+        self.retrieval_service.retrieve.return_value = []
+
+        result = self.service.generate(
+            question="Explain the material from Lecture 3.",
+            course_id="FILM 220",
+            retrieval_query="16mm Filmmaking: Explain the material from Lecture 3.",
+        )
+
+        self.retrieval_service.retrieve.assert_called_once_with(
+            query="16mm Filmmaking: Explain the material from Lecture 3.",
+            course_id="FILM 220",
+            document_ids=None,
+            top_k=5,
+            source_policy="internal_only",
+        )
+
+        self.assertEqual(result.evidence_status, "insufficient")
+        self.llm.generate.assert_not_called()
+
+
+    def test_filters_internal_evidence_before_generation(self) -> None:
+        relevant = Evidence(
+            text="TCP sequence numbers keep received segments in order.",
+            quality_score=1.0,
+            source={
+                "source_type": "internal",
+                "metadata": {
+                    "document_id": "doc-1",
+                    "version_id": "version-1",
+                    "chunk_id": "relevant",
+                    "course_id": "CS537",
+                    "chunk_index": 0,
+                },
+            },
+        )
+        irrelevant = relevant.model_copy(deep=True)
+        irrelevant.evidence_id = "internal:irrelevant"
+        irrelevant.text = "The CPU scheduler selects runnable processes."
+
+        self.retrieval_service.retrieve.return_value = [relevant, irrelevant]
+
+        relevance_service = Mock(spec=EvidenceRelevanceService)
+        relevance_service.filter.return_value = [relevant]
+
+        service = RAGService(
+            retrieval_service=self.retrieval_service,
+            llm=self.llm,
+            relevance_service=relevance_service,
+        )
+
+        self.llm.generate.return_value = json.dumps({
+            "claims": [{
+                "text": "TCP sequence numbers keep segments in order.",
+                "evidence": [{
+                    "evidence_id": relevant.evidence_id,
+                    "relationship": "supports",
+                    "confidence": 0.95,
+                }],
+            }],
+        })
+
+        result = service.generate(
+            question="How does TCP preserve ordering?",
+            course_id="CS537",
+            retrieval_query="Networking: TCP packet ordering",
+        )
+
+        relevance_service.filter.assert_called_once_with(
+            question="Networking: TCP packet ordering",
+            evidence=[relevant, irrelevant],
+        )
+
+        prompt = self.llm.generate.call_args.args[0]
+        self.assertIn(relevant.evidence_id, prompt)
+        self.assertNotIn(irrelevant.evidence_id, prompt)
+        self.assertEqual(result.evidence_status, "sufficient")
+        self.assertEqual(len(result.citations), 1)
+        self.assertEqual(result.citations[0].evidence_id, relevant.evidence_id)
+
+    def test_returns_insufficient_when_all_candidates_are_rejected(self) -> None:
+        evidence = Evidence(
+            text="Unrelated course material.",
+            source={
+                "source_type": "internal",
+                "metadata": {
+                    "document_id": "doc-1",
+                    "version_id": "version-1",
+                    "chunk_id": "unrelated",
+                    "course_id": "CS537",
+                    "chunk_index": 0,
+                },
+            },
+        )
+        self.retrieval_service.retrieve.return_value = [evidence]
+
+        relevance_service = Mock(spec=EvidenceRelevanceService)
+        relevance_service.filter.return_value = []
+
+        service = RAGService(
+            retrieval_service=self.retrieval_service,
+            llm=self.llm,
+            relevance_service=relevance_service,
+        )
+
+        result = service.generate(question="Explain TCP.", course_id="CS537")
+
+        self.assertEqual(result.evidence_status, "insufficient")
+        self.assertEqual(result.citations, [])
+        self.assertEqual(result.claims, [])
+        self.llm.generate.assert_not_called()
+
+    def test_external_retrieval_skips_relevance_filter(self) -> None:
+        evidence = Evidence(
+            text="TCP is a connection-oriented transport protocol.",
+            quality_score=0.9,
+            source={
+                "source_type": "external",
+                "provider": "searxng",
+                "url": "https://example.edu/tcp",
+            },
+        )
+        self.retrieval_service.retrieve.return_value = [evidence]
+
+        relevance_service = Mock(spec=EvidenceRelevanceService)
+        service = RAGService(
+            retrieval_service=self.retrieval_service,
+            llm=self.llm,
+            relevance_service=relevance_service,
+        )
+
+        self.llm.generate.return_value = json.dumps({
+            "claims": [{
+                "text": "TCP is a connection-oriented transport protocol.",
+                "evidence": [{
+                    "evidence_id": evidence.evidence_id,
+                    "relationship": "supports",
+                    "confidence": 0.95,
+                }],
+            }],
+        })
+
+        result = service.generate(
+            question="Search the web for TCP information.",
+            course_id="CS537",
+            source_policy="external_only",
+        )
+
+        relevance_service.filter.assert_not_called()
+        self.assertEqual(result.evidence_status, "sufficient")
+        self.assertEqual(len(result.citations), 1)
 
 if __name__ == "__main__":
     import unittest

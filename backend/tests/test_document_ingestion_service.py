@@ -1,3 +1,4 @@
+
 from io import BytesIO
 from unittest import TestCase
 from unittest.mock import Mock
@@ -6,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.application.document_ingestion_service import DocumentIngestionService, DuplicateDocumentError
 from src.application.docs_upload import DocumentUploadInspection, DocumentUploadInspector
-from src.db.models import DocumentRecord, DocumentVersionRecord, IngestionJobRecord
+from src.db.models import DocumentOwnerRecord, DocumentRecord, DocumentVersionRecord, IngestionJobRecord
 
 
 class FakeObjectStorage:
@@ -62,6 +63,7 @@ class TestDocumentIngestionService(TestCase):
             filename="lecture.pdf",
             declared_media_type="application/pdf",
             fileobj=fileobj,
+            user_id=1,
         )
 
         self.assertEqual(result.course_id, "CS537")
@@ -73,20 +75,26 @@ class TestDocumentIngestionService(TestCase):
 
         records = self.db.add_all.call_args.args[0]
 
-        self.assertEqual(len(records), 3)
+        self.assertEqual(len(records), 4)
         self.assertIsInstance(records[0], DocumentRecord)
         self.assertIsInstance(records[1], DocumentVersionRecord)
         self.assertIsInstance(records[2], IngestionJobRecord)
+        self.assertIsInstance(records[3], DocumentOwnerRecord)
 
         self.assertFalse(records[0].is_published)
+        self.assertEqual(records[0].owner_ref, "1")
         self.assertEqual(records[1].file_hash, "a" * 64)
         self.assertEqual(records[2].status, "queued")
         self.assertEqual(records[2].current_stage, "uploaded")
+        self.assertEqual(records[3].user_id, 1)
 
         self.db.commit.assert_called_once()
 
     def test_duplicate_document_is_rejected_before_storage(self):
-        self.db.scalar.return_value = Mock(spec=DocumentVersionRecord)
+        self.db.scalar.side_effect = [
+            Mock(spec=DocumentVersionRecord, document_id="existing-doc"),
+            Mock(spec=DocumentOwnerRecord),
+        ]
 
         with self.assertRaises(DuplicateDocumentError):
             self.service.ingest(
@@ -95,8 +103,10 @@ class TestDocumentIngestionService(TestCase):
                 filename="lecture.pdf",
                 declared_media_type="application/pdf",
                 fileobj=BytesIO(b"%PDF-1.7\nStudySync"),
+                user_id=1,
             )
 
+        self.assertEqual(self.db.scalar.call_count, 2)
         self.assertEqual(self.storage.uploaded, [])
         self.db.add_all.assert_not_called()
         self.db.commit.assert_not_called()
@@ -111,6 +121,7 @@ class TestDocumentIngestionService(TestCase):
                 filename="lecture.pdf",
                 declared_media_type="application/pdf",
                 fileobj=BytesIO(b"%PDF-1.7\nStudySync"),
+                user_id=1,
             )
 
         self.db.rollback.assert_called_once()

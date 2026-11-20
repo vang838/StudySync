@@ -12,7 +12,16 @@ from src.application.docs_upload import (
     EmptyDocumentError,
     UnsupportedDocumentTypeError,
 )
-from src.db.models import DocumentOwnerRecord, DocumentPublicationRecord, DocumentRecord, DocumentVersionRecord, User
+from src.db.models import (
+    DocumentOwnerRecord,
+    DocumentPublicationRecord,
+    DocumentRecord,
+    DocumentVersionRecord,
+    Notification,
+    NotificationPreference,
+    User,
+    UserCourseSave,
+)
 from src.db.session import get_db
 from src.ports.object_storage import (
     ObjectNotFoundError,
@@ -108,6 +117,7 @@ def upload_document(
     file: UploadFile = File(...),
     service: DocumentIngestionService = Depends(get_document_ingestion_service),
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> DocumentUploadResponse:
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file must have a filename.")
@@ -278,9 +288,42 @@ def set_document_publish_state(
     )
     if payload.is_published and publication is None:
         db.add(DocumentPublicationRecord(document_id=document_id, user_id=current_user.user_id))
+        document.is_published = True
     elif not payload.is_published and publication is not None:
         db.delete(publication)
+        db.flush()
+        remaining_publications = db.scalar(
+            select(DocumentPublicationRecord.id)
+            .where(DocumentPublicationRecord.document_id == document_id)
+            .limit(1)
+        )
+        document.is_published = remaining_publications is not None
     db.commit()
+
+    if payload.is_published and publication is None:
+        memberships = db.scalars(
+            select(UserCourseSave).where(
+                UserCourseSave.course_id == document.course_id,
+                UserCourseSave.is_archived.is_(False),
+                UserCourseSave.user_id != current_user.user_id,
+            )
+        ).all()
+        for membership in memberships:
+            preference = db.scalar(
+                select(NotificationPreference).where(
+                    NotificationPreference.user_id == membership.user_id
+                )
+            )
+            if preference is not None and not preference.course_file_uploads:
+                continue
+            db.add(Notification(
+                user_id=membership.user_id,
+                type="course_file_upload",
+                title=f"New file in {document.course_id}",
+                message=f"{current_user.user_first_name} {current_user.user_last_name}: {document.title}",
+                link=f"/courses/{document.course_id}",
+            ))
+        db.commit()
 
     published_by = [
         DocumentPublisherResponse(

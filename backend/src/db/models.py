@@ -75,6 +75,55 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    notification_preference: Mapped["NotificationPreference | None"] = relationship(
+        "NotificationPreference",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+    notifications: Mapped[list["Notification"]] = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    forum_replies: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    study_tasks: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    study_materials: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    challenges: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    course_file_uploads: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    saved_course_posts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    user: Mapped["User"] = relationship(back_populates="notification_preference")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    notification_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    message: Mapped[str] = mapped_column(String(1000), nullable=False)
+    link: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="notifications")
+
 class FlashcardSets(Base):
     __tablename__ = "flashcard_sets"
 

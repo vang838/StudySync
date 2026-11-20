@@ -443,6 +443,80 @@ export function StudyTasksProvider({ children }: { children: ReactNode }) {
   }, [tasks, loaded]);
 
   useEffect(() => {
+    if (!loaded) return;
+    if (window.localStorage.getItem("auth_session") !== "authenticated") return;
+
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const sentKey = "studysync-study-task-notifications";
+    let sentIds: string[] = [];
+
+    try {
+      sentIds = JSON.parse(window.localStorage.getItem(sentKey) ?? "[]") as string[];
+    } catch {
+      sentIds = [];
+    }
+
+    tasks
+      .filter((task) => !task.completed && task.dueDate === todayKey)
+      .forEach((task) => {
+        if (sentIds.includes(task.id)) return;
+        void fetch("/api/notifications", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            type: "study_task",
+            title: "Study task due today",
+            message: `${task.title}${task.course ? ` for ${task.course}` : ""} is due today.`,
+            link: "/dashboard",
+          }),
+        }).then((response) => {
+          if (response.ok) {
+            sentIds = [...sentIds, task.id];
+            window.localStorage.setItem(sentKey, JSON.stringify(sentIds));
+          }
+        }).catch(() => {});
+      });
+  }, [tasks, loaded]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (window.localStorage.getItem("auth_session") !== "authenticated") return;
+
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const sentKey = "studysync-study-task-notifications";
+    let sentIds: string[] = [];
+
+    try {
+      sentIds = JSON.parse(window.localStorage.getItem(sentKey) ?? "[]") as string[];
+    } catch {
+      sentIds = [];
+    }
+
+    tasks
+      .filter((task) => !task.completed && task.dueDate === todayKey)
+      .forEach((task) => {
+        if (sentIds.includes(task.id)) return;
+        void fetch("/api/notifications", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            type: "study_task",
+            title: "Study task due today",
+            message: `${task.title}${task.course ? ` for ${task.course}` : ""} is due today.`,
+            link: "/dashboard",
+          }),
+        }).then((response) => {
+          if (response.ok) {
+            sentIds = [...sentIds, task.id];
+            window.localStorage.setItem(sentKey, JSON.stringify(sentIds));
+          }
+        }).catch(() => {});
+      });
+  }, [tasks, loaded]);
+
+  useEffect(() => {
     if (!loaded || !backendReady.current) return;
     void fetch("/api/study-tasks/settings", {
       method: "PUT",

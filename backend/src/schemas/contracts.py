@@ -26,6 +26,22 @@ class UpdateUserRequest(BaseModel):
         return validate_password_strength(value) if value is not None else None
 
 
+class NotificationPreferenceRequest(BaseModel):
+    forum_replies: bool = True
+    study_tasks: bool = True
+    study_materials: bool = True
+    challenges: bool = True
+    course_file_uploads: bool = True
+    saved_course_posts: bool = True
+
+
+class NotificationCreateRequest(BaseModel):
+    type: Literal["forum_reply", "study_task", "study_material", "challenge_completed", "course_file_upload", "saved_course_post"]
+    title: str = Field(min_length=1, max_length=200)
+    message: str = Field(min_length=1, max_length=1000)
+    link: str | None = Field(default=None, max_length=500)
+
+
 class AuthLoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)

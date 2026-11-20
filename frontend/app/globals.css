@@ -210,3 +210,18 @@ footer {
   color: #64748b;
   font-size: 13px;
 }
+
+@keyframes notification-slide-in {
+  from {
+    opacity: 0;
+    translate: 0 -20px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+.notification-slide-in {
+  animation: notification-slide-in 220ms ease-out;
+}
