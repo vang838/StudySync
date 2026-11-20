@@ -43,12 +43,13 @@ class RAGService:
         top_k: int = 5,
         hint_level: int | None = None,
         source_policy: SourcePolicy = "internal_only",
+        retrieval_query: str | None = None,
     ) -> RAGResult:
         question = question.strip()
         if not question: raise ValueError("question must not be empty")
 
         evidence = self._retrieval_service.retrieve(
-            query=question,
+            query=retrieval_query if retrieval_query is not None else question,
             course_id=course_id,
             document_ids=document_ids,
             top_k=top_k,

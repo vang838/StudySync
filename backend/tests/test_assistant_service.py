@@ -4,10 +4,9 @@ from unittest.mock import Mock
 
 from src.application.assistant_service import AssistantService
 from src.application.rag_service import RAGResult, RAGService
+from src.ports.course_repository import CourseMetadata, CourseRepositoryPort
 from src.ports.llm import LLMPort
 from src.schemas.retrieval import ExternalCitation
-
-from src.ports.course_repository import CourseMetadata, CourseRepositoryPort
 
 
 class TestAssistantService(TestCase):
@@ -68,6 +67,7 @@ class TestAssistantService(TestCase):
             course_id="MATH101",
             hint_level=None,
             source_policy="internal_only",
+            retrieval_query="How do I solve problem 7?",
         )
 
     def test_passes_hint_level_to_rag(self) -> None:
@@ -90,6 +90,7 @@ class TestAssistantService(TestCase):
             course_id="MATH101",
             hint_level=1,
             source_policy="internal_only",
+            retrieval_query="How do I solve problem 7?",
         )
 
     def test_routes_general_question_away_from_rag(self) -> None:
@@ -132,6 +133,7 @@ class TestAssistantService(TestCase):
             course_id="FILM 220",
             hint_level=None,
             source_policy="internal_only",
+            retrieval_query="16mm Filmmaking: Explain the material from Lecture 3.",
         )
 
     def test_course_description_uses_metadata_without_rag(self) -> None:
@@ -248,5 +250,28 @@ class TestAssistantService(TestCase):
             course_id="FILM 220",
             hint_level=None,
             source_policy="external_only",
+            retrieval_query="Search the web for 16mm filmmaking resources.",
         )
         self.llm.generate.assert_not_called()
+
+    def test_explicit_topic_preserves_retrieval_query(self) -> None:
+        self.course_repository.get_by_id.return_value = self.course
+        self.llm.generate.return_value = "COURSE"
+        self.rag_service.generate.return_value = RAGResult(
+            answer="Course-grounded answer.",
+            citations=[],
+        )
+
+        result = self.service.generate(
+            question="Explain aperture and exposure.",
+            course_id="FILM 220",
+        )
+
+        self.assertEqual(result.mode, "course")
+        self.rag_service.generate.assert_called_once_with(
+            question="Explain aperture and exposure.",
+            course_id="FILM 220",
+            hint_level=None,
+            source_policy="internal_only",
+            retrieval_query="Explain aperture and exposure.",
+        )

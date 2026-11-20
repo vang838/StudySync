@@ -146,6 +146,26 @@ class TestRAGService(TestCase):
             source_policy="external_only",
         )
 
+    def test_uses_contextual_retrieval_query(self) -> None:
+        self.retrieval_service.retrieve.return_value = []
+
+        result = self.service.generate(
+            question="Explain the material from Lecture 3.",
+            course_id="FILM 220",
+            retrieval_query="16mm Filmmaking: Explain the material from Lecture 3.",
+        )
+
+        self.retrieval_service.retrieve.assert_called_once_with(
+            query="16mm Filmmaking: Explain the material from Lecture 3.",
+            course_id="FILM 220",
+            document_ids=None,
+            top_k=5,
+            source_policy="internal_only",
+        )
+
+        self.assertEqual(result.evidence_status, "insufficient")
+        self.llm.generate.assert_not_called()
+
 if __name__ == "__main__":
     import unittest
 
