@@ -1,0 +1,53 @@
+[
+  {
+    "question": "How does an operating system handle a page fault?",
+    "passages": [
+      {
+        "text": "A page fault causes a trap into the kernel, which checks the virtual address and may load the missing page from backing storage.",
+        "relevant": true
+      },
+      {
+        "text": "The CPU scheduler selects a runnable process according to the scheduling policy.",
+        "relevant": false
+      },
+      {
+        "text": "The page fault handler resolves missing virtual memory mappings before allowing execution to resume.",
+        "relevant": true
+      }
+    ]
+  },
+  {
+    "question": "How does TCP ensure packets are delivered in order?",
+    "passages": [
+      {
+        "text": "TCP uses sequence numbers to reconstruct the original byte stream even when network segments arrive out of order.",
+        "relevant": true
+      },
+      {
+        "text": "UDP provides datagram delivery without guaranteeing ordered delivery.",
+        "relevant": false
+      },
+      {
+        "text": "The receiver uses sequence information to reorder incoming TCP segments.",
+        "relevant": true
+      }
+    ]
+  },
+  {
+    "question": "What did Lecture 3 cover about film exposure?",
+    "passages": [
+      {
+        "text": "Lecture 3: Film exposure is controlled by aperture, shutter speed, and film sensitivity.",
+        "relevant": true
+      },
+      {
+        "text": "Lecture 4: Film editing involves assembling shots and establishing continuity.",
+        "relevant": false
+      },
+      {
+        "text": "Lecture 3: A light meter helps determine appropriate exposure for 16mm film.",
+        "relevant": true
+      }
+    ]
+  }
+]

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
+from src.application.evidence_relevance_service import EvidenceRelevanceService
 from src.application.evidence_analysis_service import EvidenceAnalysisService
 from src.application.evidence_retrieval_service import EvidenceRetrievalService, SourcePolicy
 from src.ports.llm import LLMPort
@@ -23,15 +24,16 @@ class RAGResult:
 
 class RAGService:
     """Coordinate retrieval, evidence assessment, and grounded generation."""
-
     def __init__(
         self,
         retrieval_service: EvidenceRetrievalService,
         llm: LLMPort,
         analysis_service: EvidenceAnalysisService | None = None,
+        relevance_service: EvidenceRelevanceService | None = None,
     ) -> None:
         self._retrieval_service = retrieval_service
         self._analysis_service = analysis_service or EvidenceAnalysisService(llm)
+        self._relevance_service = relevance_service or EvidenceRelevanceService(llm)
 
 
     def generate(
@@ -43,17 +45,24 @@ class RAGService:
         top_k: int = 5,
         hint_level: int | None = None,
         source_policy: SourcePolicy = "internal_only",
+        retrieval_query: str | None = None,
     ) -> RAGResult:
         question = question.strip()
         if not question: raise ValueError("question must not be empty")
 
         evidence = self._retrieval_service.retrieve(
-            query=question,
+            query=retrieval_query if retrieval_query is not None else question,
             course_id=course_id,
             document_ids=document_ids,
             top_k=top_k,
             source_policy=source_policy,
         )
+
+        if evidence and source_policy != "external_only" and all(item.source.source_type == "internal" for item in evidence):
+            evidence = self._relevance_service.filter(
+                question=retrieval_query if retrieval_query is not None else question,
+                evidence=evidence,
+            )
 
         if not evidence:
             return RAGResult(

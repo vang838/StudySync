@@ -1,3 +1,5 @@
+import re
+
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -55,6 +57,22 @@ class AssistantService:
         "use external sources",
     )
 
+    _CONTEXT_REFERENCE_PATTERN = re.compile(
+        r"\b(?:lecture|assignment|chapter|week|homework)\s+\d+\b"
+        r"|\b(?:this|that)\s+(?:lecture|assignment|material|document|topic)\b",
+        re.IGNORECASE,
+    )
+
+    # helper method
+    @classmethod
+    def _build_retrieval_query(cls, question: str, course: CourseMetadata | None, source_policy: SourcePolicy) -> str:
+        if course is None or source_policy != "internal_only": return question
+        if not cls._CONTEXT_REFERENCE_PATTERN.search(question): return question
+        if course.title.casefold() in question.casefold(): return question
+
+        return f"{course.title}: {question}"
+
+
     def __init__(self, llm: LLMPort, rag_service: RAGService, course_repository: CourseRepositoryPort) -> None:
         self._llm = llm
         self._rag_service = rag_service
@@ -108,12 +126,15 @@ class AssistantService:
             )
             return AssistantResult(answer=answer, mode="course", citations=[])
 
+
         if intent == "course":
+            retrieval_query = self._build_retrieval_query(question, course_context, source_policy)
             result = self._rag_service.generate(
                 question=question,
                 course_id=course_id,
                 hint_level=hint_level,
                 source_policy=source_policy,
+                retrieval_query=retrieval_query,
             )
             return AssistantResult(
                 answer=result.answer,
