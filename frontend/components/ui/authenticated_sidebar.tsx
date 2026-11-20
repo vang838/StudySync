@@ -60,11 +60,12 @@ export default function Sidebars({children}: { children: React.ReactNode; }) {
                                         </SidebarMenuItem>
                                         <SidebarMenuItem>
                                           <div>
-                                              <SidebarMenuButton className="w-full" onClick={handleClick} aria-expanded={isClicked}>
-                                                  Study Tools
+                                              <SidebarMenuButton className="w-full justify-between" onClick={handleClick} aria-expanded={isClicked} aria-controls="study-tools-items">
+                                                  <span>Study Tools</span>
+                                                  <span aria-hidden className={`relative block size-3 shrink-0 text-foreground transition-transform duration-200 ease-in-out motion-reduce:transition-none ${isClicked ? "rotate-180" : ""} before:absolute before:left-0 before:top-1/2 before:h-[2px] before:w-2 before:-translate-y-1/2 before:rotate-[-45deg] before:rounded-full before:bg-current after:absolute after:right-0 after:top-1/2 after:h-[2px] after:w-2 after:-translate-y-1/2 after:rotate-[45deg] after:rounded-full after:bg-current`}/>
                                               </SidebarMenuButton>
-                                              {isClicked && (
-                                                <>
+                                              <div id="study-tools-items" aria-hidden={!isClicked} inert={!isClicked} className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none ${isClicked ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                                                <div className={`min-h-0 overflow-hidden transition-opacity duration-300 ease-in-out motion-reduce:transition-none ${isClicked ? "opacity-100" : "opacity-0"}`}>
                                                   <SidebarGroupLabel>Create</SidebarGroupLabel>
                                                   <div className="ml-3 border-l pl-3">
                                                     <SidebarMenu>
@@ -89,7 +90,9 @@ export default function Sidebars({children}: { children: React.ReactNode; }) {
                                                   <div className="ml-3 border-l pl-3">
                                                     <SidebarMenu>
                                                       <SidebarMenuItem>
-                                                          <SidebarMenuButton>My Planner</SidebarMenuButton>
+                                                        <Link href="/dashboard/planner" className="block w-full">
+                                                          <SidebarMenuButton>Task Navigator</SidebarMenuButton>
+                                                        </Link>
                                                       </SidebarMenuItem>
                                                       <SidebarMenuItem>
                                                           <Link href="/dashboard/timer" className="block w-full">
@@ -98,9 +101,8 @@ export default function Sidebars({children}: { children: React.ReactNode; }) {
                                                       </SidebarMenuItem>
                                                     </SidebarMenu>  
                                                 </div> 
-                                              </>     
-                                              )}
-                                              
+                                                </div>
+                                              </div>
                                           </div>
                                         </SidebarMenuItem>
                                     </SidebarMenu>

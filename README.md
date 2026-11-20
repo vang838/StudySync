@@ -203,8 +203,15 @@ The API should stay versioned and resource-oriented under `/api/v1`.
 - `GET /api/v1/chat/{chat_id}` - fetch a chat thread and its messages.
 - `GET /api/v1/chat/{chat_id}/stream` - stream the answer as SSE tokens.
 - `GET /api/v1/sources/{source_id}` - fetch citation or source metadata.
+- `GET /api/v1/study-tasks` - list the signed-in student's planner tasks and prioritization setting.
+- `POST /api/v1/study-tasks` - create or migrate a planner task.
+- `PUT /api/v1/study-tasks/{task_id}` - save task details and study progress.
+- `DELETE /api/v1/study-tasks/{task_id}` - delete a planner task.
+- `PUT /api/v1/study-tasks/settings` - update automatic prioritization preferences.
 
 Request and response payloads should use Pydantic models so the frontend always receives a stable contract for validation errors, streaming status, citations, and answer content.
+
+The authenticated My Planner page is available under **Study Tools → Resources → My Planner**. Planner tasks and automatic-prioritization preferences are stored per user in PostgreSQL. The matrix previews at most four active tasks per quadrant; the full task list remains available with **View All**.
 
 ## Environment Variables
 Use the backend settings and frontend API base URL that the app expects.

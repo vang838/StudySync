@@ -193,5 +193,62 @@ class SetOut(BaseModel):
 class RatingInput(BaseModel):
     rating: Literal["easy", "practice", "hard"]
 
+
+class StudyTaskData(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(min_length=1, max_length=36)
+    title: str = Field(min_length=1, max_length=200)
+    due_date: str = Field(
+        default="",
+        alias="dueDate",
+        pattern=r"^$|^\d{4}-\d{2}-\d{2}$",
+    )
+    course: str = Field(default="", max_length=200)
+    completed: bool = False
+    importance: Literal["high", "medium", "low"] = "medium"
+    kind: Literal["academic", "administrative", "optional"] = "academic"
+    quadrant: Literal["do-first", "schedule", "delegate", "eliminate"] = "schedule"
+    quadrant_override: Literal["do-first", "schedule", "delegate", "eliminate"] | None = Field(
+        default=None,
+        alias="quadrantOverride",
+    )
+    estimated_hours: float = Field(default=1, ge=0, le=500, alias="estimatedHours")
+    estimated_pomodoros: int = Field(default=1, ge=0, le=1000, alias="estimatedPomodoros")
+    completed_pomodoros: int = Field(default=0, ge=0, alias="completedPomodoros")
+    depends_on: list[str] = Field(default_factory=list, max_length=100, alias="dependsOn")
+    recurrence: Literal["none", "weekly"] = "none"
+    last_pomodoro_session_id: str | None = Field(
+        default=None,
+        alias="lastPomodoroSessionId",
+        max_length=64,
+    )
+    updated_at: datetime = Field(alias="updatedAt")
+
+    @field_validator("title")
+    @classmethod
+    def normalize_task_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Task title cannot be empty.")
+        return normalized
+
+    @field_validator("due_date")
+    @classmethod
+    def validate_due_date(cls, value: str) -> str:
+        if value:
+            datetime.strptime(value, "%Y-%m-%d")
+        return value
+
+
+class StudyTasksResponse(BaseModel):
+    tasks: list[StudyTaskData]
+    auto_prioritization_enabled: bool = Field(alias="autoPrioritizationEnabled")
+
+
+class StudyPlannerSettingsUpdate(BaseModel):
+    auto_prioritization_enabled: bool = Field(alias="autoPrioritizationEnabled")
+
+
 class ChatCreateResponse(ChatThread):
     pass

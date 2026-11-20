@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import type { SetData } from "@/lib/types/flashcard";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 async function flashcardRequest(
   path = "",
@@ -78,63 +87,105 @@ export default function FlashcardSetPage({
   }, [setId]);
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto p-6 md:p-10">
-      <div className="mx-auto max-w-4xl space-y-6 pb-12">
-        <Link className="underline" href="/dashboard/flashcards/library">
-          ← Flashcard library
-        </Link>
-        {error && <p role="alert" className="text-red-600">{error}</p>}
-        {!set && !error && <p role="status">Loading set…</p>}
+    <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 pb-10">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-muted-foreground">
+              StudySync Flashcards
+            </p>
+            <h1 className="break-words font-heading text-3xl font-bold">
+              {set?.title ?? "Flashcard Set"}
+            </h1>
+          </div>
+          <Link href="/dashboard/flashcards/library">
+            <Button variant="secondary" size="s">
+                Go to Flashcard Library
+            </Button>
+          </Link>
+        </header>
+
+        <Separator />
+
+        {error && (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            {error}
+          </p>
+        )}
+        {!set && !error && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Loading set…
+          </p>
+        )}
+
         {set && (
           <>
-            <header className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {set.course_id} · {set.cards.length} cards
-              </p>
-              <h1 className="break-words text-3xl font-bold">{set.title}</h1>
-              <p className="whitespace-pre-wrap break-words">
-                {set.description}
-              </p>
-              <div className="flex gap-4">
+            <Card>
+              <CardHeader>
+                <CardDescription>
+                  {set.course_id} · {set.cards.length}{" "}
+                  {set.cards.length === 1 ? "card" : "cards"}
+                </CardDescription>
+                <CardTitle className="break-words">{set.title}</CardTitle>
+                {set.description && (
+                  <CardDescription className="whitespace-pre-wrap break-words">
+                    {set.description}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-3">
                 <Link
-                  className="rounded-lg bg-primary px-5 py-2 text-primary-foreground"
                   href={`/dashboard/flashcards/${setId}/study`}
                 >
-                  Study set
+                  <Button>Study set</Button>
                 </Link>
                 <Link
-                  className="rounded-lg border px-5 py-2"
                   href={`/dashboard/flashcards/${setId}/edit`}
                 >
-                  Edit cards
+                  <Button variant="outline">Edit cards</Button>
                 </Link>
+              </CardContent>
+            </Card>
+
+            <section aria-label="Cards in this set" className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-secondary">
+                  SET CONTENTS
+                </p>
+                <h2 className="mt-1 font-heading text-2xl font-semibold">
+                  Cards in this set
+                </h2>
               </div>
-            </header>
-            <h2 className="text-xl font-semibold">Cards in this set</h2>
-            <ol className="space-y-4">
-              {set.cards.map((card, index) => (
-                <li
-                  key={card.flashcard_id}
-                  className="rounded-xl border p-5"
-                >
-                  <h3 className="mb-3 font-semibold">Card {index + 1}</h3>
-                  <dl className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <dt className="text-sm text-muted-foreground">Front</dt>
-                      <dd className="whitespace-pre-wrap break-words">
-                        {card.question}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm text-muted-foreground">Back</dt>
-                      <dd className="whitespace-pre-wrap break-words">
-                        {card.answer}
-                      </dd>
-                    </div>
-                  </dl>
-                </li>
-              ))}
-            </ol>
+              <div className="grid gap-4">
+                {set.cards.map((card, index) => (
+                  <Card key={card.flashcard_id}>
+                    <CardHeader>
+                      <CardTitle>Card {index + 1}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <dl className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <dt className="text-sm font-medium text-muted-foreground">
+                            Term
+                          </dt>
+                          <dd className="whitespace-pre-wrap break-words">
+                            {card.question}
+                          </dd>
+                        </div>
+                        <div className="space-y-1">
+                          <dt className="text-sm font-medium text-muted-foreground">
+                            Definition
+                          </dt>
+                          <dd className="whitespace-pre-wrap break-words">
+                            {card.answer}
+                          </dd>
+                        </div>
+                      </dl>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
           </>
         )}
       </div>

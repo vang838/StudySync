@@ -9,8 +9,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useStudyTasks } from "./StudyTasksProvider";
 
 type TimerPhase = "focus" | "break";
+type CompletedTaskSession = { id: string; taskId: string };
 
 type TimerState = {
   phase: TimerPhase;
@@ -20,33 +22,50 @@ type TimerState = {
   completedSessions: number;
   hasSession: boolean;
   message: string;
+  focusDurationMinutes: number;
+  breakDurationMinutes: number;
+  activeTaskId: string | null;
+  lastCompletedTaskSession: CompletedTaskSession | null;
 };
 
 type PomodoroContextValue = TimerState & {
-  start: () => void;
+  activeTaskTitle: string | null;
+  start: (taskId?: string) => void;
   pause: () => void;
   reset: () => void;
   selectPhase: (phase: TimerPhase) => void;
+  configureDurations: (focusMinutes: number, breakMinutes: number) => void;
 };
 
 const STORAGE_KEY = "studysync-pomodoro-timer";
-const FOCUS_SECONDS = 25 * 60;
-const BREAK_SECONDS = 5 * 60;
+const PROCESSED_TASK_SESSION_KEY = "studysync-processed-pomodoro-session";
 
 const initialState: TimerState = {
   phase: "focus",
-  secondsLeft: FOCUS_SECONDS,
+  secondsLeft: 30 * 60,
   isRunning: false,
   endsAt: null,
   completedSessions: 0,
   hasSession: false,
   message: "",
+  focusDurationMinutes: 30,
+  breakDurationMinutes: 10,
+  activeTaskId: null,
+  lastCompletedTaskSession: null,
 };
 
 const PomodoroContext = createContext<PomodoroContextValue | null>(null);
 
-function phaseDuration(phase: TimerPhase) {
-  return phase === "focus" ? FOCUS_SECONDS : BREAK_SECONDS;
+function phaseDuration(
+  phase: TimerPhase,
+  focusDurationMinutes: number,
+  breakDurationMinutes: number,
+) {
+  return (phase === "focus" ? focusDurationMinutes : breakDurationMinutes) * 60;
+}
+
+function createSessionId() {
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 }
 
 function restoreTimer(raw: string | null): TimerState {
@@ -70,6 +89,37 @@ function restoreTimer(raw: string | null): TimerState {
     }
 
     const phase = saved.phase;
+    const focusDurationMinutes =
+      "focusDurationMinutes" in saved &&
+      typeof saved.focusDurationMinutes === "number" &&
+      saved.focusDurationMinutes >= 1 &&
+      saved.focusDurationMinutes <= 120
+        ? Math.floor(saved.focusDurationMinutes)
+        : initialState.focusDurationMinutes;
+    const breakDurationMinutes =
+      "breakDurationMinutes" in saved &&
+      typeof saved.breakDurationMinutes === "number" &&
+      saved.breakDurationMinutes >= 1 &&
+      saved.breakDurationMinutes <= 30
+        ? Math.floor(saved.breakDurationMinutes)
+        : initialState.breakDurationMinutes;
+    const activeTaskId =
+      "activeTaskId" in saved && typeof saved.activeTaskId === "string"
+        ? saved.activeTaskId
+        : null;
+    const lastCompletedTaskSession =
+      "lastCompletedTaskSession" in saved &&
+      typeof saved.lastCompletedTaskSession === "object" &&
+      saved.lastCompletedTaskSession !== null &&
+      "id" in saved.lastCompletedTaskSession &&
+      typeof saved.lastCompletedTaskSession.id === "string" &&
+      "taskId" in saved.lastCompletedTaskSession &&
+      typeof saved.lastCompletedTaskSession.taskId === "string"
+        ? {
+            id: saved.lastCompletedTaskSession.id,
+            taskId: saved.lastCompletedTaskSession.taskId,
+          }
+        : null;
     const endsAt =
       "endsAt" in saved && typeof saved.endsAt === "number"
         ? saved.endsAt
@@ -85,9 +135,20 @@ function restoreTimer(raw: string | null): TimerState {
       return {
         ...initialState,
         phase: nextPhase,
-        secondsLeft: phaseDuration(nextPhase),
+        secondsLeft: phaseDuration(
+          nextPhase,
+          focusDurationMinutes,
+          breakDurationMinutes,
+        ),
         completedSessions,
         hasSession: true,
+        focusDurationMinutes,
+        breakDurationMinutes,
+        activeTaskId,
+        lastCompletedTaskSession:
+          phase === "focus" && activeTaskId
+            ? { id: createSessionId(), taskId: activeTaskId }
+            : lastCompletedTaskSession,
         message:
           phase === "focus"
             ? "Focus session complete. Take a short break."
@@ -102,6 +163,10 @@ function restoreTimer(raw: string | null): TimerState {
       isRunning: saved.isRunning && endsAt !== null,
       endsAt: saved.isRunning ? endsAt : null,
       completedSessions: Math.max(0, Math.floor(saved.completedSessions)),
+      focusDurationMinutes,
+      breakDurationMinutes,
+      activeTaskId,
+      lastCompletedTaskSession,
       hasSession: "hasSession" in saved && saved.hasSession === true,
       message: "message" in saved && typeof saved.message === "string"
         ? saved.message
@@ -113,13 +178,19 @@ function restoreTimer(raw: string | null): TimerState {
 }
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
+  const { tasks, loaded: tasksLoaded, recordPomodoroSession } = useStudyTasks();
   const [timer, setTimer] = useState(initialState);
   const [loaded, setLoaded] = useState(false);
   const pathname = usePathname();
+  const activeTaskTitle =
+    tasks.find((task) => task.id === timer.activeTaskId)?.title ?? null;
 
   useEffect(() => {
-    setTimer(restoreTimer(window.localStorage.getItem(STORAGE_KEY)));
-    setLoaded(true);
+    const timeout = window.setTimeout(() => {
+      setTimer(restoreTimer(window.localStorage.getItem(STORAGE_KEY)));
+      setLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
@@ -127,6 +198,28 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(timer));
     }
   }, [loaded, timer]);
+
+  useEffect(() => {
+    const completedSession = timer.lastCompletedTaskSession;
+    if (!loaded || !tasksLoaded || !completedSession) return;
+
+    try {
+      if (
+        window.localStorage.getItem(PROCESSED_TASK_SESSION_KEY) ===
+        completedSession.id
+      ) {
+        return;
+      }
+
+      recordPomodoroSession(completedSession.taskId, completedSession.id);
+      window.localStorage.setItem(
+        PROCESSED_TASK_SESSION_KEY,
+        completedSession.id,
+      );
+    } catch (error) {
+      console.error("Unable to record the completed task study session.", error);
+    }
+  }, [loaded, tasksLoaded, timer.lastCompletedTaskSession, recordPomodoroSession]);
 
   useEffect(() => {
     if (!timer.isRunning || timer.endsAt === null) return;
@@ -142,11 +235,22 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
           return {
             ...current,
             phase: nextPhase,
-            secondsLeft: phaseDuration(nextPhase),
+            secondsLeft: phaseDuration(
+              nextPhase,
+              current.focusDurationMinutes,
+              current.breakDurationMinutes,
+            ),
             isRunning: false,
             endsAt: null,
             completedSessions:
               current.completedSessions + (current.phase === "focus" ? 1 : 0),
+            lastCompletedTaskSession:
+              current.phase === "focus" && current.activeTaskId
+                ? {
+                    id: createSessionId(),
+                    taskId: current.activeTaskId,
+                  }
+                : current.lastCompletedTaskSession,
             message:
               current.phase === "focus"
                 ? "Focus session complete. Take a short break."
@@ -166,14 +270,28 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(interval);
   }, [timer.endsAt, timer.isRunning]);
 
-  function start() {
-    setTimer((current) => ({
-      ...current,
-      isRunning: true,
-      endsAt: Date.now() + current.secondsLeft * 1000,
-      hasSession: true,
-      message: "",
-    }));
+  function start(taskId?: string) {
+    setTimer((current) => {
+      const startFocus = Boolean(taskId) && current.phase !== "focus";
+      const phase = startFocus ? "focus" : current.phase;
+      const secondsLeft = startFocus
+        ? phaseDuration(
+            "focus",
+            current.focusDurationMinutes,
+            current.breakDurationMinutes,
+          )
+        : current.secondsLeft;
+      return {
+        ...current,
+        phase,
+        secondsLeft,
+        isRunning: true,
+        endsAt: Date.now() + secondsLeft * 1000,
+        hasSession: true,
+        activeTaskId: taskId ?? current.activeTaskId,
+        message: "",
+      };
+    });
   }
 
   function pause() {
@@ -192,6 +310,15 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     setTimer({
       ...initialState,
       completedSessions: timer.completedSessions,
+      focusDurationMinutes: timer.focusDurationMinutes,
+      breakDurationMinutes: timer.breakDurationMinutes,
+      activeTaskId: timer.activeTaskId,
+      lastCompletedTaskSession: timer.lastCompletedTaskSession,
+      secondsLeft: phaseDuration(
+        "focus",
+        timer.focusDurationMinutes,
+        timer.breakDurationMinutes,
+      ),
     });
   }
 
@@ -199,7 +326,11 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     setTimer((current) => ({
       ...current,
       phase,
-      secondsLeft: phaseDuration(phase),
+      secondsLeft: phaseDuration(
+        phase,
+        current.focusDurationMinutes,
+        current.breakDurationMinutes,
+      ),
       isRunning: false,
       endsAt: null,
       hasSession: false,
@@ -207,9 +338,44 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     }));
   }
 
+  function configureDurations(focusMinutes: number, breakMinutes: number) {
+    if (
+      !Number.isInteger(focusMinutes) ||
+      focusMinutes < 1 ||
+      focusMinutes > 120 ||
+      !Number.isInteger(breakMinutes) ||
+      breakMinutes < 1 ||
+      breakMinutes > 30
+    ) {
+      throw new Error("Focus and break durations are outside the allowed range.");
+    }
+
+    setTimer((current) => {
+      if (current.isRunning) return current;
+      return {
+        ...current,
+        focusDurationMinutes: focusMinutes,
+        breakDurationMinutes: breakMinutes,
+        secondsLeft: phaseDuration(
+          current.phase,
+          focusMinutes,
+          breakMinutes,
+        ),
+      };
+    });
+  }
+
   return (
     <PomodoroContext.Provider
-      value={{ ...timer, start, pause, reset, selectPhase }}
+      value={{
+        ...timer,
+        activeTaskTitle,
+        start,
+        pause,
+        reset,
+        selectPhase,
+        configureDurations,
+      }}
     >
       {children}
       {loaded && timer.hasSession && pathname !== "/dashboard/timer" && (
@@ -219,7 +385,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         >
           <div>
             <p className="text-xs font-medium text-muted-foreground">
-              {timer.phase === "focus" ? "Focus session" : "Short break"}
+              {activeTaskTitle ?? (timer.phase === "focus" ? "Focus session" : "Short break")}
             </p>
             <p className="font-mono text-lg font-semibold tabular-nums">
               {formatTime(timer.secondsLeft)}
@@ -235,7 +401,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
           </div>
           <button
             type="button"
-            onClick={timer.isRunning ? pause : start}
+            onClick={() =>
+              timer.isRunning ? pause() : start()
+            }
             className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
           >
             {timer.isRunning ? "Pause" : "Resume"}
