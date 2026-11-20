@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from src.db.base import Base
-from src.db.models import DocumentOwnerRecord, DocumentPublicationRecord, DocumentRecord, DocumentVersionRecord, User
+from src.db.models import DocumentOwnerRecord, DocumentPublicationRecord, DocumentRecord, DocumentVersionRecord, IngestionJobRecord, User
 from src.db.session import get_db
 
 from src.api.dependencies import get_object_storage
@@ -278,3 +278,32 @@ class TestDocumentsManagementApi(TestCase):
     def test_delete_document_not_found(self):
         response = self.client.delete("/api/v1/documents/missing")
         self.assertEqual(response.status_code, 404)
+
+    def test_get_document_ingestion_status(self):
+        self._insert_document(
+            document_id="doc1",
+            course_id="CS537",
+            title="Lecture Notes",
+            version_id="ver1",
+            object_key="documents/doc1/versions/ver1/original.pdf",
+        )
+
+        self.db.add(IngestionJobRecord(
+            job_id="job1",
+            version_id="ver1",
+            status="queued",
+            current_stage="uploaded",
+            pipeline_version="1",
+        ))
+        self.db.commit()
+
+        response = self.client.get("/api/v1/documents/doc1/ingestion")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["job_id"], "job1")
+        self.assertEqual(response.json()["status"], "queued")
+        self.assertEqual(response.json()["current_stage"], "uploaded")
+
+        self.client.cookies.clear()
+        unauthorized = self.client.get("/api/v1/documents/doc1/ingestion")
+        self.assertEqual(unauthorized.status_code, 401)

@@ -268,3 +268,12 @@ class StudyPlannerSettingsUpdate(BaseModel):
 
 class ChatCreateResponse(ChatThread):
     pass
+
+class DocumentIngestionStatusResponse(BaseModel):
+    document_id: str
+    job_id: str
+    status: Literal["queued", "processing", "ready", "failed"]
+    current_stage: str | None
+    retry_count: int
+    failure_code: str | None
+    completed_at: datetime | None
