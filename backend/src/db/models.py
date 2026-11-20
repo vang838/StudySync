@@ -6,8 +6,10 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -348,6 +350,62 @@ class UserCourseSave(Base):
         DateTime(timezone=True),
         nullable=False,
         default=utcnow,
+    )
+
+
+class StudyPlannerPreference(Base):
+    __tablename__ = "study_planner_preferences"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    auto_prioritization_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+
+class StudyTaskRecord(Base):
+    __tablename__ = "study_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    due_date: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    course: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    importance: Mapped[str] = mapped_column(String(16), nullable=False, default="medium")
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, default="academic")
+    quadrant: Mapped[str] = mapped_column(String(32), nullable=False, default="schedule")
+    quadrant_override: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    estimated_hours: Mapped[float] = mapped_column(Float, nullable=False, default=1)
+    estimated_pomodoros: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    completed_pomodoros: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    depends_on: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    recurrence: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
+    last_pomodoro_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
     )
 
 

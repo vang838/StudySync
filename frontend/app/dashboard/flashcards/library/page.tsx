@@ -3,6 +3,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { SetData } from "@/lib/types/flashcard";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 async function flashcardRequest(
   path = "",
@@ -53,8 +64,7 @@ async function listFlashcardSets(): Promise<SetData[]> {
   return (await response.json()) as SetData[];
 }
 
-export default function FlashcardLibrary() 
-{
+export default function FlashcardLibrary() {
   const [sets, setSets] = useState<SetData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,45 +72,139 @@ export default function FlashcardLibrary()
 
   useEffect(() => {
     let active = true;
-    listFlashcardSets().then((data) => { if (active) setSets(data); })
-      .catch((e: Error) => { if (active) setError(e.message); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    listFlashcardSets()
+      .then((data) => {
+        if (active) setSets(data);
+      })
+      .catch((e: Error) => {
+        if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const visible = sets.filter((set) => `${set.title} ${set.description ?? ""} ${set.course_id}`.toLowerCase().includes(search.toLowerCase()));
-  return (
-    <main className="min-h-0 flex-1 overflow-y-auto p-6 md:p-10">
-      <div className="mx-auto max-w-5xl space-y-6">
+  const visible = sets.filter((set) =>
+    `${set.title} ${set.description ?? ""} ${set.course_id}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
 
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div><p className="text-sm text-muted-foreground">Library</p><h1 className="text-3xl font-bold">Your flashcard sets</h1></div>
-          <Link href="/dashboard/flashcards" className="rounded-lg bg-primary px-5 py-3 text-primary-foreground">+ Create flashcards</Link>
+  return (
+    <main className="h-full min-h-0 flex-1 overflow-y-auto bg-background px-6 py-6 text-foreground md:px-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-10 pb-10">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-muted-foreground">
+              StudySync Flashcards
+            </p>
+            <h1 className="font-heading text-3xl font-bold">
+              Your Flashcard Sets
+            </h1>
+          </div>
+          <Link href="/dashboard/flashcards">
+            <Button>+ Create flashcards</Button>
+          </Link>
         </header>
 
-        <label className="block">Search by title, description, or course
-          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} className="mt-2 w-full rounded-lg border p-3" />
-        </label>
+        <Separator />
 
-        {loading && <p role="status">Loading flashcards…</p>}
-        {error && <p role="alert" className="text-red-600">{error}</p>}
-        {!loading && !error && !sets.length && <p>No flashcard sets yet. Create a set to start studying.</p>}
-        {!loading && sets.length > 0 && !visible.length && <p>No sets match your search.</p>}
-        
-        <section aria-label="Flashcard sets" className="grid gap-4 md:grid-cols-2">
-          {visible.map((set) => <article key={set.flashcardsets_id} className="space-y-4 rounded-xl border bg-card p-5">
-            <p className="text-sm text-muted-foreground">{set.course_id} · {set.cards.length} cards</p>
-            <h2 className="break-words text-xl font-semibold"><Link className="underline" href={`/dashboard/flashcards/${set.flashcardsets_id}`}>{set.title}</Link></h2>
-            <p className="whitespace-pre-wrap break-words text-muted-foreground">{set.description}</p>
-            
-            <div className="flex gap-4">
-              <Link className="underline" href={`/dashboard/flashcards/${set.flashcardsets_id}/study`}>Study</Link>
-              <Link className="underline" href={`/dashboard/flashcards/${set.flashcardsets_id}/edit`}>Edit set</Link>
-            </div>
-            
-          </article>)}
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Search Flashcard Sets</CardTitle>
+            <CardDescription>
+              Search by set title, description, or course number.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Input
+              type="search"
+              aria-label="Search flashcard sets"
+              placeholder="Search flashcards..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="w-full"
+            />
+          </CardContent>
+        </Card>
 
+        {loading && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Loading flashcards…
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            {error}
+          </p>
+        )}
+        {!loading && !error && sets.length === 0 && (
+          <Card>
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              No flashcard sets yet. Create a set to start studying.
+            </CardContent>
+          </Card>
+        )}
+        {!loading && !error && sets.length > 0 && visible.length === 0 && (
+          <Card>
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              No sets match your search.
+            </CardContent>
+          </Card>
+        )}
+        {!loading && !error && visible.length > 0 && (
+          <>
+            <p className="text-sm text-muted-foreground">
+              {visible.length} flashcard set{visible.length === 1 ? "" : "s"}
+            </p>
+            <section
+              aria-label="Flashcard sets"
+              className="grid grid-cols-1 gap-4 md:grid-cols-2"
+            >
+              {visible.map((set) => (
+                <Card key={set.flashcardsets_id} className="h-full">
+                  <CardHeader>
+                    <CardDescription>
+                      {set.course_id} · {set.cards.length}{" "}
+                      {set.cards.length === 1 ? "card" : "cards"}
+                    </CardDescription>
+                    <CardTitle className="break-words">
+                      <Link
+                        href={`/dashboard/flashcards/${set.flashcardsets_id}`}
+                        className="hover:underline"
+                      >
+                        {set.title}
+                      </Link>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                      {set.description || "No description provided."}
+                    </p>
+                  </CardContent>
+                  <CardFooter className="flex flex-nowrap justify-center gap-2">
+                    <Link
+                      href={`/dashboard/flashcards/${set.flashcardsets_id}/study`}
+                    >
+                      <Button size="s">Study</Button>
+                    </Link>
+                    <Link
+                      href={`/dashboard/flashcards/${set.flashcardsets_id}/edit`}
+                    >
+                      <Button variant="outline" size="s">
+                        Edit set
+                      </Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
+              ))}
+            </section>
+          </>
+        )}
       </div>
     </main>
   );

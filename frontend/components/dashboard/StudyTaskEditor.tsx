@@ -24,7 +24,13 @@ export default function StudyTaskEditor({date}: { date: Date }) {
 
         if (!title.trim()) return;
 
-        addTask(title, dateKey(date), course);
+        addTask({
+            title,
+            dueDate: dateKey(date),
+            course,
+            importance: "medium",
+            kind: "academic",
+        });
         setTitle("");
         setCourse("");
     }

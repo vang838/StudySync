@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import AssistantWidget from "@/components/assistant/AssistantWidget";
 import { PomodoroProvider } from "@/components/dashboard/PomodoroProvider";
+import { StudyTasksProvider } from "@/components/dashboard/StudyTasksProvider";
 
 const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
 
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           className="min-w-0 flex-1"
           style={{ marginRight: "var(--assistant-width, 0px)" }}
         >
-          <PomodoroProvider>{children}</PomodoroProvider>
+          <StudyTasksProvider>
+            <PomodoroProvider>{children}</PomodoroProvider>
+          </StudyTasksProvider>
         </div>
 
         <AssistantWidget />
