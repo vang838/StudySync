@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.main import app
 from src.db.base import Base
-from src.db.models import Course, User, UserCourseSave
+from src.db.models import Course, Notification, User, UserCourseSave
 from src.db.session import get_db
 
 
@@ -332,6 +332,19 @@ class TestCourseSaveAPI(unittest.TestCase):
         )
         self.assertEqual(reply_response.status_code, 200)
         reply_post_id = reply_response.json()["post_id"]
+
+        with self.session_factory() as db:
+            notification = db.scalar(
+                select(Notification).where(
+                    Notification.user_id == 1,
+                    Notification.type == "forum_reply",
+                )
+            )
+            self.assertIsNotNone(notification)
+            self.assertIn(
+                "Sure, think memoization + optimal substructure.",
+                notification.message,
+            )
 
         thread_response = self.client.get("/api/v1/courses/CS101/forum/posts")
         self.assertEqual(thread_response.status_code, 200)

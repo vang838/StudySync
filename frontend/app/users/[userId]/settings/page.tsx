@@ -14,6 +14,15 @@ type UserProfile = {
   email: string;
 };
 
+type NotificationPreferences = {
+  forum_replies: boolean;
+  study_tasks: boolean;
+  study_materials: boolean;
+  challenges: boolean;
+  course_file_uploads: boolean;
+  saved_course_posts: boolean;
+};
+
 export default function UserProfilePage({
   params,
 }: {
@@ -30,6 +39,16 @@ export default function UserProfilePage({
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
+    forum_replies: true,
+    study_tasks: true,
+    study_materials: true,
+    challenges: true,
+    course_file_uploads: true,
+    saved_course_posts: true,
+  });
+  const [savingNotifications, setSavingNotifications] = useState(false);
+  const [notificationSettingsError, setNotificationSettingsError] = useState<string | null>(null);
   
 useEffect(() => {
     const loadProfile = async () => {
@@ -60,6 +79,47 @@ useEffect(() => {
   
     void loadProfile();
 }, [params]);
+
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const response = await fetch("/api/notifications/preferences", {cache: "no-store"});
+        if (!response.ok) {
+          throw new Error("Unable to load notification settings.");
+        }
+        setNotificationPreferences(await response.json() as NotificationPreferences);
+      } catch (loadError) {
+        setNotificationSettingsError(loadError instanceof Error ? loadError.message : "Unable to load notification settings.");
+      }
+    };
+
+    void loadPreferences();
+  }, []);
+
+  const updateNotificationPreference = async (key: keyof NotificationPreferences, enabled: boolean) => {
+    const nextPreferences = {...notificationPreferences, [key]: enabled};
+    setNotificationPreferences(nextPreferences);
+    setSavingNotifications(true);
+    setNotificationSettingsError(null);
+
+    try {
+      const response = await fetch("/api/notifications/preferences", {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(nextPreferences),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.detail ?? "Unable to save notification settings.");
+      }
+      setNotificationPreferences(await response.json() as NotificationPreferences);
+    } catch (saveError) {
+      setNotificationPreferences(notificationPreferences);
+      setNotificationSettingsError(saveError instanceof Error ? saveError.message : "Unable to save notification settings.");
+    } finally {
+      setSavingNotifications(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -236,6 +296,41 @@ useEffect(() => {
                 </CardContent>
               </Card>
             </form>
+            <Card>
+              <CardHeader>
+                <CardTitle>Notifications</CardTitle>
+                <CardDescription>Choose which in-app notifications you want to receive.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {([
+                  ["forum_replies", "Forum replies", "When someone replies to your forum post."],
+                  ["study_tasks", "Study tasks", "When a study task is approaching."],
+                  ["study_materials", "Generated study materials", "When generated study material is ready."],
+                  ["challenges", "Challenge completions", "When a challenge is completed."],
+                  ["course_file_uploads", "Course file uploads", "When a new file is uploaded to a saved course."],
+                  ["saved_course_posts", "Saved course posts", "When a new post is made in a saved course."],
+                ] as const).map(([key, label, description]) => (
+                  <div key={key} className="flex items-center justify-between gap-4 rounded-lg border border-foreground/10 px-4 py-3">
+                    <div>
+                      <p className="font-medium">{label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={notificationPreferences[key]}
+                      aria-label={label}
+                      disabled={savingNotifications}
+                      onClick={() => void updateNotificationPreference(key, !notificationPreferences[key])}
+                      className={`relative h-6 w-11 shrink-0 rounded-full transition ${notificationPreferences[key] ? "bg-secondary" : "bg-input"}`}
+                    >
+                      <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${notificationPreferences[key] ? "left-6" : "left-1"}`} />
+                    </button>
+                  </div>
+                ))}
+                {notificationSettingsError && <p role="alert" className="text-sm text-destructive">{notificationSettingsError}</p>}
+              </CardContent>
+            </Card>
             <form onSubmit={handleSubmitPassword}>
                 <Card>
                 <CardHeader>
