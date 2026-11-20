@@ -168,6 +168,8 @@ class TestNotificationsAPI(unittest.TestCase):
         self.assertEqual(root_response.status_code, 200)
         root_post_id = root_response.json()["post_id"]
 
+        app.dependency_overrides[get_current_user] = lambda: self._load_user(replying_user_id)
+
         reply_text = "Sure, think memoization and optimal substructure."
         reply_response = self.client.post(
             "/api/v1/courses/CS101/forum/posts",

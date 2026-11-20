@@ -1,3 +1,4 @@
+
 from io import BytesIO
 from unittest import TestCase
 
@@ -13,7 +14,7 @@ from src.application.document_normalizer import DocumentNormalizer
 from src.application.document_parser import DocumentParserRegistry
 from src.application.docs_upload import DocumentUploadInspector
 from src.db.base import Base
-from src.db.models import DocumentChunkRecord, DocumentVersionRecord, IngestionJobRecord
+from src.db.models import DocumentChunkRecord, DocumentOwnerRecord, DocumentVersionRecord, IngestionJobRecord, User
 
 
 class FakeObjectStorage:
@@ -37,6 +38,16 @@ class TestDocumentIngestionPipeline(TestCase):
         self.engine = create_engine("sqlite+pysqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.db = Session(self.engine)
+
+        user = User(
+            user_first_name="Ada",
+            user_last_name="Lovelace",
+            user_email="ada@example.com",
+            password_hash="hashed-password",
+        )
+        self.db.add(user)
+        self.db.commit()
+        self.user_id = user.user_id
 
         self.storage = FakeObjectStorage()
 
@@ -82,13 +93,19 @@ class TestDocumentIngestionPipeline(TestCase):
             filename="os-notes.txt",
             declared_media_type="text/plain",
             fileobj=BytesIO(content),
+            user_id=self.user_id,
         )
 
         self.assertEqual(upload.status, "queued")
 
         version = self.db.get(DocumentVersionRecord, upload.version_id)
+        owner = self.db.scalar(select(DocumentOwnerRecord).where(
+            DocumentOwnerRecord.document_id == upload.document_id,
+            DocumentOwnerRecord.user_id == self.user_id,
+        ))
 
         self.assertIsNotNone(version)
+        self.assertIsNotNone(owner)
         self.assertIn(version.object_key, self.storage.objects)
         self.assertEqual(self.storage.objects[version.object_key], content)
 

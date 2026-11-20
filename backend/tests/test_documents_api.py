@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
 
-from src.api.dependencies import get_document_ingestion_service
+from src.api.dependencies import get_document_ingestion_service, get_current_user
 from src.application.document_ingestion_service import (
     DocumentIngestionResult,
     DocumentIngestionService,
@@ -11,14 +11,17 @@ from src.application.document_ingestion_service import (
 )
 from src.main import app
 
+from src.db.models import User
 
 class TestDocumentsAPI(TestCase):
     def setUp(self):
         self.service = Mock(spec=DocumentIngestionService)
         app.dependency_overrides[get_document_ingestion_service] = lambda: self.service
+        app.dependency_overrides[get_current_user] = lambda: User(user_id=1)
         self.client = TestClient(app)
 
     def tearDown(self):
+        self.client.close()
         app.dependency_overrides.clear()
 
     def test_upload_document(self):
@@ -58,6 +61,7 @@ class TestDocumentsAPI(TestCase):
         self.assertEqual(body["status"], "queued")
 
         self.service.ingest.assert_called_once()
+        self.assertEqual(self.service.ingest.call_args.kwargs["user_id"], 1)
 
     def test_duplicate_document_returns_conflict(self):
         self.service.ingest.side_effect = DuplicateDocumentError(
