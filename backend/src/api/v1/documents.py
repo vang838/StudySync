@@ -21,6 +21,7 @@ from src.db.models import (
     NotificationPreference,
     User,
     UserCourseSave,
+    IngestionJobRecord,
 )
 from src.db.session import get_db
 from src.ports.object_storage import (
@@ -29,8 +30,8 @@ from src.ports.object_storage import (
     ObjectStoragePort,
     ObjectStorageUnavailableError,
 )
-from src.schemas.contracts import DocumentDeleteResponse, DocumentListItemResponse, DocumentPublisherResponse, DocumentUploadResponse
-from src.schemas.contracts import DocumentPublishRequest, DocumentPublishResponse
+
+from src.schemas.contracts import DocumentDeleteResponse, DocumentListItemResponse, DocumentPublisherResponse, DocumentUploadResponse, DocumentPublishRequest, DocumentPublishResponse, DocumentIngestionStatusResponse
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -160,6 +161,42 @@ def upload_document(
         status=result.status,
     )
 
+@router.get("/{document_id}/ingestion", response_model=DocumentIngestionStatusResponse)
+def get_document_ingestion_status(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentIngestionStatusResponse:
+    owner = db.scalar(
+        select(DocumentOwnerRecord).where(
+            DocumentOwnerRecord.document_id == document_id,
+            DocumentOwnerRecord.user_id == current_user.user_id,
+        )
+    )
+
+    if owner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document was not found.")
+
+    job = db.scalar(
+        select(IngestionJobRecord)
+        .join(DocumentVersionRecord, IngestionJobRecord.version_id == DocumentVersionRecord.version_id)
+        .where(DocumentVersionRecord.document_id == document_id)
+        .order_by(DocumentVersionRecord.version_number.desc(), IngestionJobRecord.created_at.desc())
+        .limit(1)
+    )
+
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document ingestion job was not found.")
+
+    return DocumentIngestionStatusResponse(
+        document_id=document_id,
+        job_id=job.job_id,
+        status=job.status,
+        current_stage=job.current_stage,
+        retry_count=job.retry_count,
+        failure_code=job.failure_code,
+        completed_at=job.completed_at,
+    )
 
 @router.delete("/{document_id}", response_model=DocumentDeleteResponse)
 def delete_document(

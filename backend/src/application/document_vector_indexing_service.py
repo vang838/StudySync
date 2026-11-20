@@ -11,6 +11,7 @@ from src.db.models import (
 from src.ports.vector_store import VectorRecord, VectorStorePort
 from src.schemas.retrieval import ChunkRetrievalMetadata
 
+from src.db.models import utcnow
 
 class DocumentVectorIndexingError(Exception):
     """Base exception for document vector indexing failures."""
@@ -100,6 +101,9 @@ class DocumentVectorIndexingService:
 
         job.status = "ready"
         job.current_stage = "indexed"
+        job.completed_at = utcnow()
+        job.failure_code = None
+        job.failure_message = None
         self._db.commit()
 
         return upserted
