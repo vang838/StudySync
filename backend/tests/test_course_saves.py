@@ -9,6 +9,7 @@ from src.main import app
 from src.db.base import Base
 from src.db.models import Course, Notification, User, UserCourseSave
 from src.db.session import get_db
+from src.core.security import create_session_token
 
 
 class TestCourseSaveAPI(unittest.TestCase):
@@ -33,6 +34,9 @@ class TestCourseSaveAPI(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_db
         self.client = TestClient(app)
+
+    def _authenticate(self, user_id: int) -> None:
+        self.client.cookies.set("studysync_session", create_session_token(user_id))
 
     def tearDown(self):
         self.client.close()
@@ -70,6 +74,8 @@ class TestCourseSaveAPI(unittest.TestCase):
                 )
             )
             db.commit()
+
+        self._authenticate(1)
 
         response = self.client.post("/api/v1/courses/CS101/save?user_id=1")
         self.assertEqual(response.status_code, 200)
@@ -141,8 +147,12 @@ class TestCourseSaveAPI(unittest.TestCase):
             )
             db.commit()
 
+        self._authenticate(1)
         self.client.post("/api/v1/courses/CS101/save?user_id=1")
+        self._authenticate(2)
         self.client.post("/api/v1/courses/CS101/save?user_id=2")
+
+        self._authenticate(1)
 
         archive_response = self.client.post("/api/v1/courses/CS101/archive?user_id=1")
         self.assertEqual(archive_response.status_code, 200)
@@ -157,10 +167,13 @@ class TestCourseSaveAPI(unittest.TestCase):
         self.assertEqual(len(user_one_all_saved.json()), 1)
         self.assertTrue(user_one_all_saved.json()[0]["is_archived"])
 
+        self._authenticate(2)
         user_two_active_saved = self.client.get("/api/v1/courses/saved?user_id=2")
         self.assertEqual(user_two_active_saved.status_code, 200)
         self.assertEqual(len(user_two_active_saved.json()), 1)
         self.assertFalse(user_two_active_saved.json()[0]["is_archived"])
+
+        self._authenticate(1)
 
         saved_only_user_one = self.client.get("/api/v1/courses/search?savedOnly=true&user_id=1")
         self.assertEqual(saved_only_user_one.status_code, 200)
@@ -264,7 +277,9 @@ class TestCourseSaveAPI(unittest.TestCase):
             )
             db.commit()
 
+        self._authenticate(2)
         self.client.post("/api/v1/courses/CS101/save?user_id=2")
+        self._authenticate(1)
         self.client.post("/api/v1/courses/CS101/save?user_id=1")
 
         members_response = self.client.get("/api/v1/courses/CS101/members")
@@ -309,8 +324,12 @@ class TestCourseSaveAPI(unittest.TestCase):
             )
             db.commit()
 
+        self._authenticate(1)
         self.client.post("/api/v1/courses/CS101/save?user_id=1")
+        self._authenticate(2)
         self.client.post("/api/v1/courses/CS101/save?user_id=2")
+
+        self._authenticate(1)
 
         root_post_response = self.client.post(
             "/api/v1/courses/CS101/forum/posts",
@@ -321,6 +340,8 @@ class TestCourseSaveAPI(unittest.TestCase):
         )
         self.assertEqual(root_post_response.status_code, 200)
         root_post_id = root_post_response.json()["post_id"]
+
+        self._authenticate(2)
 
         reply_response = self.client.post(
             "/api/v1/courses/CS101/forum/posts",
@@ -371,6 +392,8 @@ class TestCourseSaveAPI(unittest.TestCase):
         )
         self.assertEqual(forbidden_edit.status_code, 403)
 
+        self._authenticate(1)
+
         allowed_edit = self.client.put(
             f"/api/v1/courses/CS101/forum/posts/{root_post_id}",
             json={"user_id": 1, "content": "Updated question with more context"},
@@ -378,8 +401,12 @@ class TestCourseSaveAPI(unittest.TestCase):
         self.assertEqual(allowed_edit.status_code, 200)
         self.assertEqual(allowed_edit.json()["content"], "Updated question with more context")
 
+        self._authenticate(2)
+
         forbidden_delete = self.client.delete(f"/api/v1/courses/CS101/forum/posts/{root_post_id}?user_id=2")
         self.assertEqual(forbidden_delete.status_code, 403)
+
+        self._authenticate(1)
 
         allowed_delete = self.client.delete(f"/api/v1/courses/CS101/forum/posts/{root_post_id}?user_id=1")
         self.assertEqual(allowed_delete.status_code, 200)
@@ -388,6 +415,7 @@ class TestCourseSaveAPI(unittest.TestCase):
         user_one_points_response = self.client.get("/api/v1/users/1")
         self.assertEqual(user_one_points_response.status_code, 200)
         self.assertEqual(user_one_points_response.json()["forum_points"], 10)
+        self._authenticate(2)
         user_two_points_response = self.client.get("/api/v1/users/2")
         self.assertEqual(user_two_points_response.status_code, 200)
         self.assertEqual(user_two_points_response.json()["forum_points"], 10)
@@ -426,8 +454,12 @@ class TestCourseSaveAPI(unittest.TestCase):
             )
             db.commit()
 
+        self._authenticate(1)
         self.client.post("/api/v1/courses/CS101/save?user_id=1")
+        self._authenticate(2)
         self.client.post("/api/v1/courses/CS101/save?user_id=2")
+
+        self._authenticate(1)
 
         dynamic_response = self.client.post(
             "/api/v1/courses/CS101/forum/posts",
@@ -438,6 +470,8 @@ class TestCourseSaveAPI(unittest.TestCase):
         )
         self.assertEqual(dynamic_response.status_code, 200)
         dynamic_post_id = dynamic_response.json()["post_id"]
+
+        self._authenticate(2)
 
         graph_response = self.client.post(
             "/api/v1/courses/CS101/forum/posts",
@@ -459,6 +493,8 @@ class TestCourseSaveAPI(unittest.TestCase):
         )
         self.assertEqual(reply_one_response.status_code, 200)
 
+        self._authenticate(1)
+
         reply_two_response = self.client.post(
             "/api/v1/courses/CS101/forum/posts",
             json={
@@ -475,12 +511,16 @@ class TestCourseSaveAPI(unittest.TestCase):
         self.assertEqual(bookmark_response.status_code, 200)
         self.assertTrue(bookmark_response.json()["bookmarked"])
 
+        self._authenticate(2)
+
         like_response = self.client.post(
             f"/api/v1/courses/CS101/forum/posts/{dynamic_post_id}/like?user_id=2",
         )
         self.assertEqual(like_response.status_code, 200)
         self.assertTrue(like_response.json()["liked"])
         self.assertEqual(like_response.json()["like_count"], 1)
+
+        self._authenticate(1)
 
         search_response = self.client.get(
             "/api/v1/courses/CS101/forum/posts?q=dynamic&user_id=1&sort=newest",
@@ -541,12 +581,16 @@ class TestCourseSaveAPI(unittest.TestCase):
         self.assertEqual(unbookmark_response.status_code, 200)
         self.assertFalse(unbookmark_response.json()["bookmarked"])
 
+        self._authenticate(2)
+
         unlike_response = self.client.delete(
             f"/api/v1/courses/CS101/forum/posts/{dynamic_post_id}/like?user_id=2",
         )
         self.assertEqual(unlike_response.status_code, 200)
         self.assertFalse(unlike_response.json()["liked"])
         self.assertEqual(unlike_response.json()["like_count"], 0)
+
+        self._authenticate(1)
 
         user_points_response = self.client.get("/api/v1/users/1")
         self.assertEqual(user_points_response.status_code, 200)

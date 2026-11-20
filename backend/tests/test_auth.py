@@ -1,3 +1,4 @@
+
 import unittest
 
 from fastapi.testclient import TestClient
@@ -79,7 +80,7 @@ class TestAuthAPI(unittest.TestCase):
             "/api/v1/auth/resetpassword",
             json={
                 "email": "ada@example.com",
-                "password": "new-password-456",
+                "password": "New-password-456!",
             },
         )
 
@@ -90,7 +91,7 @@ class TestAuthAPI(unittest.TestCase):
             user = db.scalar(select(User).where(User.user_email == "ada@example.com"))
 
         self.assertIsNotNone(user)
-        self.assertTrue(verify_password("new-password-456", user.password_hash))
+        self.assertTrue(verify_password("New-password-456!", user.password_hash))
         self.assertFalse(verify_password("old-password-123", user.password_hash))
 
     def test_forgotpassword_returns_generic_success_response(self):

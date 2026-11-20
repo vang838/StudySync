@@ -2,16 +2,20 @@ from datetime import datetime, timezone
 from unittest import TestCase
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from src.api.dependencies import get_object_storage
 from src.db.base import Base
-from src.db.models import DocumentRecord, DocumentVersionRecord
+from src.db.models import DocumentOwnerRecord, DocumentPublicationRecord, DocumentRecord, DocumentVersionRecord, User
 from src.db.session import get_db
+
+from src.api.dependencies import get_object_storage
+
 from src.main import app
 from src.ports.object_storage import ObjectStorageError
+
+from src.core.security import create_session_token
 
 
 class _FakeStorage:
@@ -42,6 +46,15 @@ class TestDocumentsManagementApi(TestCase):
         self.db = Session(self.engine)
         self.storage = _FakeStorage()
 
+        self.user = User(
+            user_first_name="Ada",
+            user_last_name="Lovelace",
+            user_email="ada@example.com",
+            password_hash="hashed-password",
+        )
+        self.db.add(self.user)
+        self.db.commit()
+
         def _override_get_db():
             try:
                 yield self.db
@@ -50,7 +63,9 @@ class TestDocumentsManagementApi(TestCase):
 
         app.dependency_overrides[get_db] = _override_get_db
         app.dependency_overrides[get_object_storage] = lambda: self.storage
+
         self.client = TestClient(app)
+        self.client.cookies.set("studysync_session", create_session_token(self.user.user_id))
 
     def tearDown(self):
         app.dependency_overrides.clear()
@@ -87,7 +102,8 @@ class TestDocumentsManagementApi(TestCase):
             object_key=object_key,
             created_at=datetime.now(timezone.utc),
         )
-        self.db.add_all([document, version])
+        owner = DocumentOwnerRecord(document_id=document_id, user_id=self.user.user_id)
+        self.db.add_all([document, version, owner])
         self.db.commit()
 
     def test_list_documents(self):
@@ -207,7 +223,14 @@ class TestDocumentsManagementApi(TestCase):
         body = response.json()
         self.assertEqual(body["document_id"], "doc1")
         self.assertTrue(body["is_published"])
-        self.assertTrue(self.db.get(DocumentRecord, "doc1").is_published)
+        publication = self.db.scalar(
+            select(DocumentPublicationRecord).where(
+                DocumentPublicationRecord.document_id == "doc1",
+                DocumentPublicationRecord.user_id == self.user.user_id,
+            )
+        )
+        self.assertIsNotNone(publication)
+        self.assertTrue(body["is_published_by_current_user"])
 
     def test_publish_document_not_found(self):
         response = self.client.patch(
