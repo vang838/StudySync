@@ -6,12 +6,20 @@ from src.application.rag_service import RAGResult, RAGService
 from src.ports.llm import LLMPort
 from src.schemas.retrieval import ExternalCitation
 
+from src.ports.course_repository import CourseMetadata, CourseRepositoryPort
 
 class TestAssistantService(TestCase):
     def setUp(self) -> None:
         self.llm = Mock(spec=LLMPort)
         self.rag_service = Mock(spec=RAGService)
-        self.service = AssistantService(llm=self.llm, rag_service=self.rag_service)
+        self.course_repository = Mock(spec=CourseRepositoryPort)
+        self.course_repository.get_by_id.return_value = None
+
+        self.service = AssistantService(
+            llm=self.llm,
+            rag_service=self.rag_service,
+            course_repository=self.course_repository,
+        )
 
     def test_uses_general_llm_without_course_context(self) -> None:
         self.llm.generate.return_value = "General answer."
@@ -90,3 +98,31 @@ class TestAssistantService(TestCase):
 
         self.llm.generate.assert_not_called()
         self.rag_service.generate.assert_not_called()
+
+    def test_resolves_course_context_before_rag(self) -> None:
+        self.course_repository.get_by_id.return_value = CourseMetadata(
+            course_id="FILM 220",
+            title="16mm Filmmaking",
+            description="3 cr. Post-foundation studio in 16mm film production.",
+            subject="FILM",
+            professor="S. Drake",
+            year=2026,
+        )
+        self.llm.generate.return_value = "COURSE"
+        self.rag_service.generate.return_value = RAGResult(
+            answer="Course-grounded answer.",
+            citations=[],
+        )
+
+        result = self.service.generate(
+            question="What is this class about?",
+            course_id=" FILM 220 ",
+        )
+
+        self.assertEqual(result.mode, "course")
+        self.course_repository.get_by_id.assert_called_once_with("FILM 220")
+        self.rag_service.generate.assert_called_once_with(
+            question="What is this class about?",
+            course_id="FILM 220",
+            hint_level=None,
+        )

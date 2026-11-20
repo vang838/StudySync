@@ -8,7 +8,6 @@ from src.adapters.llm.ollama import OllamaAdapter
 from src.adapters.embedding.ollama import OllamaEmbeddingAdapter
 from src.adapters.llm.openai_compatible import OpenAICompatibleAdapter
 from src.adapters.embedding.cloudflare import CloudflareEmbeddingAdapter
-
 from src.adapters.storage.local import LocalObjectStorageAdapter
 from src.adapters.storage.r2 import R2ObjectStorageAdapter
 
@@ -49,9 +48,15 @@ from src.ports.vector_store import VectorStorePort
 from src.application.assistant_service import AssistantService
 from src.ports.llm import LLMPort
 
+from src.adapters.repositories.sqlalchemy_course import SQLAlchemyCourseRepositoryAdapter
+from src.ports.course_repository import CourseRepositoryPort
+
 import httpx
 from src.adapters.external_retrieval.searxng import SearXNGExternalRetrievalAdapter
 
+
+def get_course_repository(db: Session = Depends(get_db)) -> CourseRepositoryPort:
+    return SQLAlchemyCourseRepositoryAdapter(db)
 
 def get_current_user(
     studysync_session: str | None = Cookie(default=None),
@@ -240,5 +245,9 @@ def get_evidence_retrieval_service(document_retrieval: DocumentRetrievalService 
 def get_rag_service(retrieval_service: EvidenceRetrievalService = Depends(get_evidence_retrieval_service), llm: LLMPort = Depends(get_llm_port)) -> RAGService:
     return RAGService(retrieval_service=retrieval_service, llm=llm)
 
-def get_assistant_service(llm: LLMPort = Depends(get_llm_port), rag_service: RAGService = Depends(get_rag_service)) -> AssistantService:
-    return AssistantService(llm=llm, rag_service=rag_service)
+def get_assistant_service(
+    llm: LLMPort = Depends(get_llm_port),
+    rag_service: RAGService = Depends(get_rag_service),
+    course_repository: CourseRepositoryPort = Depends(get_course_repository),
+) -> AssistantService:
+    return AssistantService(llm=llm, rag_service=rag_service, course_repository=course_repository)

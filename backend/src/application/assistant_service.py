@@ -2,7 +2,10 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from src.application.rag_service import RAGService
+
 from src.ports.llm import LLMPort
+from src.ports.course_repository import CourseRepositoryPort
+
 from src.schemas.retrieval import Citation, GeneratedClaim
 
 
@@ -18,9 +21,12 @@ class AssistantResult:
 class AssistantService:
     """Route assistant questions between general generation and course RAG."""
 
-    def __init__(self, llm: LLMPort, rag_service: RAGService) -> None:
+
+    def __init__(self, llm: LLMPort, rag_service: RAGService, course_repository: CourseRepositoryPort) -> None:
         self._llm = llm
         self._rag_service = rag_service
+        self._course_repository = course_repository
+
 
     def generate(self, *, question: str, course_id: str | None = None, hint_level: int | None = None) -> AssistantResult:
         question = question.strip()
@@ -52,6 +58,10 @@ class AssistantService:
             )
 
         course_id = course_id.strip()
+        course_context = self._course_repository.get_by_id(course_id)
+        if course_context is not None:
+            course_id = course_context.course_id
+
         mode = self._classify(question)
 
         if mode == "course":
