@@ -1,6 +1,6 @@
 
 from typing import List, Literal
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,6 +15,8 @@ from src.db.models import (
     CourseForumPostBookmark,
     CourseForumPostLike,
     ForumPointTransaction,
+    Notification,
+    NotificationPreference,
     User,
     UserCourseSave,
 )
@@ -524,6 +526,57 @@ def create_forum_post(
     db.commit()
     db.refresh(created)
     author_name = f"{user.user_first_name} {user.user_last_name}".strip()
+    if parent_post_id is None:
+        memberships = db.scalars(
+            select(UserCourseSave).where(
+                UserCourseSave.course_id == course_id,
+                UserCourseSave.is_archived.is_(False),
+                UserCourseSave.user_id != payload.user_id,
+            )
+        ).all()
+        post_preview = " ".join(created.content.split())
+        if len(post_preview) > 64:
+            post_preview = f"{post_preview[:64].rstrip()}..."
+        for membership in memberships:
+            preference = db.scalar(
+                select(NotificationPreference).where(
+                    NotificationPreference.user_id == membership.user_id
+                )
+            )
+            if preference is not None and not preference.saved_course_posts:
+                continue
+            db.add(Notification(
+                user_id=membership.user_id,
+                type="saved_course_post",
+                title=f"New post in {course_id}: {post_preview}",
+                message=f"{author_name}: {created.content}",
+                link=f"/courses/{quote(course_id, safe='')}/forum/{created.post_id}",
+            ))
+        db.commit()
+    if parent_post_id is not None and parent_post.user_id != payload.user_id:
+        associated_post = parent_post
+        while associated_post.parent_post_id is not None:
+            associated_post = db.get(CourseForumPost, associated_post.parent_post_id)
+            if associated_post is None or associated_post.course_id != course_id:
+                associated_post = parent_post
+                break
+        preference = db.scalar(
+            select(NotificationPreference).where(
+                NotificationPreference.user_id == parent_post.user_id
+            )
+        )
+        if preference is None or preference.forum_replies:
+            post_preview = " ".join(parent_post.content.split())
+            if len(post_preview) > 64:
+                post_preview = f"{post_preview[:64].rstrip()}..."
+            db.add(Notification(
+                user_id=parent_post.user_id,
+                type="forum_reply",
+                title=f"New reply to Post: {post_preview}",
+                message=f"{author_name}: {created.content}",
+                link=f"/courses/{quote(course_id, safe='')}/forum/{associated_post.post_id}",
+            ))
+            db.commit()
     return _serialize_forum_post(created, author_name, False, False, 0)
 
 

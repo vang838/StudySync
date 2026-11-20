@@ -144,6 +144,23 @@ def init_db() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE users ADD COLUMN password_needs_update BOOLEAN NOT NULL DEFAULT TRUE"))
 
+    if "notification_preferences" in table_names:
+        preference_columns = {
+            column["name"]
+            for column in inspector.get_columns("notification_preferences")
+        }
+        with engine.begin() as conn:
+            if "course_file_uploads" not in preference_columns:
+                conn.execute(text(
+                    "ALTER TABLE notification_preferences "
+                    "ADD COLUMN course_file_uploads BOOLEAN NOT NULL DEFAULT TRUE"
+                ))
+            if "saved_course_posts" not in preference_columns:
+                conn.execute(text(
+                    "ALTER TABLE notification_preferences "
+                    "ADD COLUMN saved_course_posts BOOLEAN NOT NULL DEFAULT TRUE"
+                ))
+
     # 2. Seed initial data for the Course table
     SessionLocal = get_session_factory()
     with SessionLocal() as session:
