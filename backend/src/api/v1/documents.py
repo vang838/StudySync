@@ -13,6 +13,7 @@ from src.application.docs_upload import (
     UnsupportedDocumentTypeError,
 )
 from src.db.models import (
+    Course,
     DocumentOwnerRecord,
     DocumentPublicationRecord,
     DocumentRecord,
@@ -121,7 +122,31 @@ def upload_document(
     db: Session = Depends(get_db),
 ) -> DocumentUploadResponse:
     if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file must have a filename.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file must have a filename."
+        )
+    course = db.get(Course, course_id)
+
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found.",
+        )
+
+    membership = db.scalar(
+        select(UserCourseSave.id).where(
+            UserCourseSave.course_id == course_id,
+            UserCourseSave.user_id == current_user.user_id,
+            UserCourseSave.is_archived.is_(False),
+        )
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You must save this course before uploading documents.",
+        )
 
     try:
         result = service.ingest(
@@ -258,12 +283,29 @@ def download_document(
     preview: bool = Query(default=False),
     db: Session = Depends(get_db),
     storage: ObjectStoragePort = Depends(get_object_storage),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> Response:
     document = db.get(DocumentRecord, document_id)
     if document is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document was not found.",
+        )
+
+    is_published = document.is_published or bool(document.publications)
+
+    is_owner = (
+        current_user is not None
+        and any(
+            owner.user_id == current_user.user_id
+            for owner in document.owners
+        )
+    )
+
+    if not is_published and not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to download this document.",
         )
 
     version = document.versions[-1] if document.versions else None
