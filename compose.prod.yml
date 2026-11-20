@@ -1,4 +1,19 @@
 services:
+  worker:
+      image: studysync-backend:latest
+      container_name: studysync-worker
+      restart: unless-stopped
+
+      command: ["python", "-m", "scripts.run_ingestion_worker"]
+
+      env_file:
+        - /etc/studysync/.env
+        - /etc/studysync/.env.embedding.cloudflare
+
+      depends_on:
+        postgres:
+          condition: service_healthy
+          
   postgres:
     image: postgres:17
     container_name: studysync-postgres
