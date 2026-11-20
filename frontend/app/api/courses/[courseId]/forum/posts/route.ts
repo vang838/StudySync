@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 
 async function proxyForumRequest(
@@ -23,6 +24,7 @@ async function proxyForumRequest(
       headers: {
         'content-type': request.headers.get('content-type') ?? 'application/json',
         accept: 'application/json',
+        cookie: request.headers.get('cookie') ?? '',
       },
       body: method === 'POST' ? await request.text() : undefined,
       signal: controller.signal,

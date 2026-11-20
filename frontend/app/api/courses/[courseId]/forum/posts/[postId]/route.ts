@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 
 async function proxyForumPostMutation(
@@ -27,6 +28,7 @@ async function proxyForumPostMutation(
       headers: {
         'content-type': request.headers.get('content-type') ?? 'application/json',
         accept: 'application/json',
+        cookie: request.headers.get('cookie') ?? '',
       },
       body: method === 'PUT' ? await request.text() : undefined,
       signal: controller.signal,

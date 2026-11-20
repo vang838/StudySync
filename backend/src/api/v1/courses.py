@@ -1,3 +1,4 @@
+
 from typing import List, Literal
 from urllib.parse import unquote
 
@@ -22,7 +23,7 @@ from src.core.forum_points import (
     POINTS_PER_FORUM_POST_OR_REPLY,
 )
 from src.db.session import get_db
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user, get_optional_current_user
 from src.schemas.contracts import (
     CourseCreateRequest,
     ForumPostCreateRequest,
@@ -101,6 +102,14 @@ def _assert_user_is_course_member(db: Session, course_id: str, user_id: int) -> 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User must save this course before participating in forum discussions.",
+        )
+
+
+def _assert_forum_actor(user_id: int, current_user: User) -> None:
+    if user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You may only perform forum actions for your own account.",
         )
 
 
@@ -270,7 +279,7 @@ def _search_courses(
 ) -> tuple[List[dict], int]:
     """Queries the database for courses matching the given filters."""
     query = db.query(Course)
-    
+
     # Apply filters dynamically using SQLAlchemy query methods
     if filters.get("subject"):
         query = query.filter(Course.subject.ilike(f"%{filters['subject']}%"))
@@ -407,7 +416,10 @@ def list_forum_posts(
     author_user_id: int | None = Query(default=None, ge=1, description="Filter to posts authored by this user."),
     bookmarked_only: bool = Query(default=False, description="When true, return only bookmarked discussions."),
     sort: Literal["newest", "popular"] = Query(default="newest", description="Sort mode for root discussions."),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> List[dict]:
+    if user_id is not None and (current_user is None or user_id != current_user.user_id):
+        raise HTTPException(status_code=403, detail="You may only access your own forum preferences.")
     _get_course_or_404(db, course_id)
     if user_id is not None:
         _get_user_or_404(db, user_id)
@@ -456,7 +468,10 @@ def get_forum_post_thread(
     post_id: int,
     db: Session = Depends(get_db),
     user_id: int | None = Query(default=None, ge=1, description="Used to resolve bookmark state for the post."),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> dict:
+    if user_id is not None and (current_user is None or user_id != current_user.user_id):
+        raise HTTPException(status_code=403, detail="You may only access your own forum preferences.")
     _get_course_or_404(db, course_id)
     if user_id is not None:
         _get_user_or_404(db, user_id)
@@ -477,10 +492,12 @@ def create_forum_post(
     course_id: str,
     payload: ForumPostCreateRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    _assert_forum_actor(payload.user_id, current_user)
     _get_course_or_404(db, course_id)
-    user = _get_user_or_404(db, payload.user_id)
-    _assert_user_is_course_member(db, course_id, payload.user_id)
+    user = current_user
+    _assert_user_is_course_member(db, course_id, current_user.user_id)
 
     parent_post_id: int | None = payload.parent_post_id
     if parent_post_id is not None:
@@ -516,7 +533,9 @@ def update_forum_post(
     post_id: int,
     payload: ForumPostUpdateRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    _assert_forum_actor(payload.user_id, current_user)
     _get_course_or_404(db, course_id)
     _get_user_or_404(db, payload.user_id)
     post = db.get(CourseForumPost, post_id)
@@ -559,7 +578,9 @@ def delete_forum_post(
     post_id: int,
     user_id: int = Query(..., ge=1, description="User deleting their own forum post."),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    _assert_forum_actor(user_id, current_user)
     _get_course_or_404(db, course_id)
     _get_user_or_404(db, user_id)
     post = db.get(CourseForumPost, post_id)
@@ -585,7 +606,9 @@ def bookmark_forum_post(
     post_id: int,
     user_id: int = Query(..., ge=1, description="User bookmarking the forum post."),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    _assert_forum_actor(user_id, current_user)
     _get_course_or_404(db, course_id)
     _get_user_or_404(db, user_id)
     _assert_user_is_course_member(db, course_id, user_id)
@@ -622,7 +645,9 @@ def remove_forum_post_bookmark(
     post_id: int,
     user_id: int = Query(..., ge=1, description="User removing their bookmark."),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    _assert_forum_actor(user_id, current_user)
     _get_course_or_404(db, course_id)
     _get_user_or_404(db, user_id)
     post = db.get(CourseForumPost, post_id)
@@ -657,7 +682,9 @@ def like_forum_post(
     post_id: int,
     user_id: int = Query(..., ge=1, description="User liking the forum post."),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    _assert_forum_actor(user_id, current_user)
     _get_course_or_404(db, course_id)
     _get_user_or_404(db, user_id)
     _assert_user_is_course_member(db, course_id, user_id)
@@ -703,7 +730,9 @@ def unlike_forum_post(
     post_id: int,
     user_id: int = Query(..., ge=1, description="User removing their like."),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    _assert_forum_actor(user_id, current_user)
     _get_course_or_404(db, course_id)
     _get_user_or_404(db, user_id)
     post = db.get(CourseForumPost, post_id)
@@ -941,7 +970,7 @@ def archive_saved_course_for_user(
     return {
         "message": "Course archived successfully.",
         "course_id": course_id,
-        "user_id": resolved_user_id,
+        "user_id": user_id,
         "archived": True,
     }
 
@@ -1018,12 +1047,14 @@ def get_course(course_id: str, db: Session = Depends(get_db)) -> dict:
     course = _get_course_or_404(db, course_id)
     return _serialize_course(course)
 
+
 @router.get("")
 def list_courses():
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="Listing all courses endpoint is deprecated. Please use /search instead.",
     )
+
 
 @router.post("")
 def create_course(payload: CourseCreateRequest, db: Session = Depends(get_db)) -> dict:
