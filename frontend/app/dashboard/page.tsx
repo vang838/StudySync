@@ -42,13 +42,13 @@ type UploadedDocument = {
 
 const quickActions = [
     {
-        title: "My courses",
+        title: "My Courses",
         description: "Continue learning",
         href: "#courses",
         icon: BookOpen01Icon,
     },
     {
-        title: "Recent uploads",
+        title: "Recent Uploads",
         description: "Find your materials",
         href: "#uploads",
         icon: Upload01Icon,
@@ -60,7 +60,7 @@ const quickActions = [
         icon: Calendar03Icon,
     },
     {
-        title: "Study tasks",
+        title: "Study Tasks",
         description: "See what's next",
         href: "#tasks",
         icon: CheckmarkCircle01Icon,

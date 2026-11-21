@@ -307,20 +307,20 @@ export default function Header() {
                                                 {userId !== null && <Link href={`/users/${userId}/student_profile`}
                                                                           className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Profile</Link>}
                                                 {userId !== null && <Link href={`/users/${userId}/settings`}
-                                                                          className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Setting</Link>}
+                                                                          className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Settings</Link>}
                                                 {userId !== null && <Link href={`/users/${userId}/uploads`}
                                                                           className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Uploads</Link>}
                                                 {userId !== null && <Link href={`/users/${userId}/ratings`}
-                                                                          className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Your
+                                                                          className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">My
                                                     Ratings</Link>}
                                                 {userId !== null ? (
                                                     <button type="button" onClick={logout}
-                                                            className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Logout
+                                                            className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">Log Out
                                                     </button>
                                                 ) : (
                                                     <Link href="/auth/signin"
                                                           className="rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">
-                                                        Sign in
+                                                        Sign In
                                                     </Link>
                                                 )}
                                             </CardContent>
