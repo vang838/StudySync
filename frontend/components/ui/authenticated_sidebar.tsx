@@ -57,9 +57,7 @@ export default function Sidebars({ children }: { children: React.ReactNode }) {
                     </SidebarNavLink>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>Library</SidebarMenuButton>
-                    </SidebarMenuItem>
+                    <SidebarMenuButton>Library</SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarNavLink href="/dashboard/study-center" isActive={pathname === "/dashboard/study-center"}>
@@ -84,57 +82,57 @@ export default function Sidebars({ children }: { children: React.ReactNode }) {
                       <span>Study Tools</span>
                       <span aria-hidden="true" className={`relative block size-3 shrink-0 text-foreground transition-transform duration-200 ease-in-out motion-reduce:transition-none ${isClicked ? "rotate-180" : ""} before:absolute before:left-0 before:top-1/2 before:h-[2px] before:w-2 before:-translate-y-1/2 before:rotate-[-45deg] before:rounded-full before:bg-current after:absolute after:right-0 after:top-1/2 after:h-[2px] after:w-2 after:-translate-y-1/2 after:rotate-[45deg] after:rounded-full after:bg-current`} />
                     </SidebarMenuButton>
-
-                    <div
-                      id="study-tools-items"
-                      aria-hidden={!isClicked}
-                      inert={!isClicked}
-                      className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none ${isClicked ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
-                    >
-                      <div className={`min-h-0 overflow-hidden transition-opacity duration-300 ease-in-out motion-reduce:transition-none ${isClicked ? "opacity-100" : "opacity-0"}`}>
-                        <SidebarGroupLabel>Create</SidebarGroupLabel>
-                        <div className="ml-3 border-l pl-3">
-                          <SidebarMenu>
-                            <SidebarMenuItem>
-                              <SidebarNavLink href="/dashboard/study-center">
-                                Practice Exam
-                              </SidebarNavLink>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarNavLink href="/dashboard/study-center">
-                                Study Guide
-                              </SidebarNavLink>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarNavLink
-                                href="/dashboard/flashcards"
-                                isActive={pathname === "/dashboard/flashcards" || pathname.startsWith("/dashboard/flashcards/")}
-                              >
-                                Flashcards
-                              </SidebarNavLink>
-                            </SidebarMenuItem>
-                          </SidebarMenu>
-                        </div>
-
-                        <SidebarGroupLabel>Resources</SidebarGroupLabel>
-                        <div className="ml-3 border-l pl-3">
-                          <SidebarMenu>
-                            <SidebarMenuItem>
-                              <SidebarNavLink href="/dashboard/planner" isActive={pathname === "/dashboard/planner"}>
-                                Task Navigator
-                              </SidebarNavLink>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarNavLink href="/dashboard/timer" isActive={pathname === "/dashboard/timer"}>
-                                Timer
-                              </SidebarNavLink>
-                            </SidebarMenuItem>
-                          </SidebarMenu>
-                        </div>
-                      </div>
-                    </div>
                   </SidebarMenuItem>
                 </SidebarMenu>
+
+                <div
+                  id="study-tools-items"
+                  aria-hidden={!isClicked}
+                  inert={!isClicked}
+                  className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none ${isClicked ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                >
+                  <div className={`min-h-0 overflow-hidden transition-opacity duration-300 ease-in-out motion-reduce:transition-none ${isClicked ? "opacity-100" : "opacity-0"}`}>
+                    <SidebarGroupLabel>Create</SidebarGroupLabel>
+                    <div className="ml-3 border-l pl-3">
+                      <SidebarMenu>
+                        <SidebarMenuItem>
+                          <SidebarNavLink href="/dashboard/study-center">
+                            Practice Exam
+                          </SidebarNavLink>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarNavLink href="/dashboard/study-center">
+                            Study Guide
+                          </SidebarNavLink>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarNavLink
+                            href="/dashboard/flashcards"
+                            isActive={pathname === "/dashboard/flashcards" || pathname.startsWith("/dashboard/flashcards/")}
+                          >
+                            Flashcards
+                          </SidebarNavLink>
+                        </SidebarMenuItem>
+                      </SidebarMenu>
+                    </div>
+
+                    <SidebarGroupLabel>Resources</SidebarGroupLabel>
+                    <div className="ml-3 border-l pl-3">
+                      <SidebarMenu>
+                        <SidebarMenuItem>
+                          <SidebarNavLink href="/dashboard/planner" isActive={pathname === "/dashboard/planner"}>
+                            Task Navigator
+                          </SidebarNavLink>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarNavLink href="/dashboard/timer" isActive={pathname === "/dashboard/timer"}>
+                            Timer
+                          </SidebarNavLink>
+                        </SidebarMenuItem>
+                      </SidebarMenu>
+                    </div>
+                  </div>
+                </div>
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
