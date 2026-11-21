@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -58,9 +57,9 @@ export default function Sidebars({ children }: { children: React.ReactNode }) {
                     </SidebarNavLink>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton disabled title="Library is not available yet">
-                      Library
-                    </SidebarMenuButton>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton>Library</SidebarMenuButton>
+                    </SidebarMenuItem>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarNavLink href="/dashboard/study-center" isActive={pathname === "/dashboard/study-center"}>
