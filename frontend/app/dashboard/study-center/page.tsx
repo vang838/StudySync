@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     Card,
@@ -9,7 +9,6 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import RecentStudyMaterials from "./RecentStudyMaterials";
-import {useSavedCourses} from "@/hooks/useSavedCourses";
 
 type StudyMode = "exam" | "guide";
 type Difficulty = "Easy" | "Medium" | "Hard";
@@ -146,22 +145,22 @@ export default function StudyCenterPage() {
                                         className={`flex h-full flex-col justify-between rounded-2xl border p-6 transition-all duration-200 ${selected
                                             ? "border-secondary bg-secondary/5 shadow-md"
                                             : "border-foreground/10 bg-card hover:border-secondary/50 hover:shadow-sm"
-                                        }`}
+                                            }`}
                                     >
                                         <div>
                                             <div className="mb-5 flex items-center justify-between">
-                        <span className="text-xs font-bold tracking-widest text-secondary">
-                          {item.number} / STUDY TOOL
-                        </span>
+                                                <span className="text-xs font-bold tracking-widest text-secondary">
+                                                    {item.number} / STUDY TOOL
+                                                </span>
 
                                                 <span
                                                     className={`flex h-6 w-6 items-center justify-center rounded-full border text-sm ${selected
                                                         ? "border-secondary bg-secondary text-secondary-foreground"
                                                         : "border-foreground/20"
-                                                    }`}
+                                                        }`}
                                                 >
-                          {selected ? "✓" : ""}
-                        </span>
+                                                    {selected ? "✓" : ""}
+                                                </span>
                                             </div>
 
                                             <h3 className="font-heading text-xl font-semibold">
@@ -175,13 +174,13 @@ export default function StudyCenterPage() {
 
                                         <div
                                             className="mt-6 flex items-center justify-between border-t border-foreground/10 pt-4">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {item.detail}
-                      </span>
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                {item.detail}
+                                            </span>
 
                                             <span className="text-sm font-semibold text-secondary">
-                        {selected ? "Selected ✓" : "Select →"}
-                      </span>
+                                                {selected ? "Selected ✓" : "Select →"}
+                                            </span>
                                         </div>
                                     </div>
                                 </button>
@@ -244,20 +243,20 @@ export default function StudyCenterPage() {
                                     {/* Custom dropdown arrow */}
                                     <span
                                         className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-muted-foreground">
-                    <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                    >
-                      <path d="m6 9 6 6 6-6"/>
-                    </svg>
-                  </span>
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="m6 9 6 6 6-6" />
+                                        </svg>
+                                    </span>
                                 </div>
 
                                 {coursesError && (
@@ -305,11 +304,10 @@ export default function StudyCenterPage() {
                                                     key={level}
                                                     onClick={() => setDifficulty(level)}
                                                     aria-pressed={difficulty === level}
-                                                    className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                                                        difficulty === level
+                                                    className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${difficulty === level
                                                             ? "border-secondary bg-secondary/10 text-foreground"
                                                             : "border-foreground/10 bg-muted/30 text-muted-foreground hover:border-secondary/40 hover:bg-muted/60"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {level}
                                                 </button>
@@ -337,7 +335,7 @@ export default function StudyCenterPage() {
                                                 className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${questionCount === count
                                                     ? "border-secondary bg-secondary/10 text-foreground"
                                                     : "border-foreground/10 bg-muted/30 text-muted-foreground hover:border-secondary/40 hover:bg-muted/60"
-                                                }`}
+                                                    }`}
                                             >
                                                 {count}
                                             </button>
@@ -361,7 +359,7 @@ export default function StudyCenterPage() {
                                                     className={`rounded-xl border px-2 py-3 text-sm font-medium transition ${guideLength === length
                                                         ? "border-secondary bg-secondary/10 text-foreground"
                                                         : "border-foreground/10 bg-muted/30 text-muted-foreground hover:border-secondary/40 hover:bg-muted/60"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {length}
                                                 </button>
@@ -387,9 +385,9 @@ export default function StudyCenterPage() {
 
                         <CardContent className="flex h-full flex-col gap-6 pt-6">
                             <div className="rounded-2xl border border-secondary/20 bg-secondary/5 p-5">
-                <span className="text-xs font-semibold uppercase tracking-widest text-secondary">
-                  {isExam ? "Practice Exam" : "Study Guide"}
-                </span>
+                                <span className="text-xs font-semibold uppercase tracking-widest text-secondary">
+                                    {isExam ? "Practice Exam" : "Study Guide"}
+                                </span>
 
                                 <h3 className="font-heading mt-3 text-xl font-bold">
                                     {selectedCourse?.title ?? "No course selected"}
@@ -402,41 +400,41 @@ export default function StudyCenterPage() {
 
                             <div className="space-y-4 text-sm">
                                 <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">
-                    Course
-                  </span>
+                                    <span className="text-muted-foreground">
+                                        Course
+                                    </span>
                                     <span className="font-medium">{course || "—"}</span>
                                 </div>
 
-                                <div className="h-px bg-foreground/10"/>
+                                <div className="h-px bg-foreground/10" />
 
 
                                 {/* Only display difficulty for exams */}
                                 {isExam && (
                                     <>
                                         <div className="flex justify-between gap-3">
-      <span className="text-muted-foreground">
-        Difficulty
-      </span>
+                                            <span className="text-muted-foreground">
+                                                Difficulty
+                                            </span>
 
                                             <span className="font-medium">
-        {difficulty}
-      </span>
+                                                {difficulty}
+                                            </span>
                                         </div>
 
-                                        <div className="h-px bg-foreground/10"/>
+                                        <div className="h-px bg-foreground/10" />
                                     </>
                                 )}
 
 
                                 <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">
-                    {isExam ? "Questions" : "Detail level"}
-                  </span>
+                                    <span className="text-muted-foreground">
+                                        {isExam ? "Questions" : "Detail level"}
+                                    </span>
 
                                     <span className="font-medium">
-                    {isExam ? questionCount : guideLength}
-                  </span>
+                                        {isExam ? questionCount : guideLength}
+                                    </span>
                                 </div>
                             </div>
 
@@ -457,7 +455,7 @@ export default function StudyCenterPage() {
                     </Card>
                 </section>
                 {/* Recent exams and study guides */}
-                <RecentStudyMaterials/>
+                <RecentStudyMaterials />
             </div>
         </main>
     );

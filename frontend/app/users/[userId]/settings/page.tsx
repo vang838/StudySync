@@ -1,5 +1,6 @@
+
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,13 @@ export default function UserProfilePage({
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordToast, setPasswordToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [passwordValidationAttempted, setPasswordValidationAttempted] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordInputRef = useRef<HTMLInputElement>(null);
+  const passwordTooWeak = passwordValidationAttempted && !isStrongPassword(password);
+  const passwordsMismatch = passwordValidationAttempted && password !== confirmPassword;
+
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
     forum_replies: true,
     study_tasks: true,
@@ -49,41 +57,41 @@ export default function UserProfilePage({
   });
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [notificationSettingsError, setNotificationSettingsError] = useState<string | null>(null);
-  
-useEffect(() => {
+
+  useEffect(() => {
     const loadProfile = async () => {
-        setLoading(true);
-        setError(null);
-  
-        try {
-          const { userId } = await params;
-          const userResponse = await fetch(`/api/users/${encodeURIComponent(userId)}`);
-  
-          if (!userResponse.ok) {
-            const body = await userResponse.json().catch(() => ({}));
-            throw new Error(body?.detail ?? `Failed to load user profile (HTTP ${userResponse.status})`);
-          }
-  
-          const userData = (await userResponse.json()) as UserProfile;
-          setUser(userData);
-          setFirstName(userData.first_name);
-          setLastName(userData.last_name);
-          setEmail(userData.email);
-        } catch (loadError) {
-          const message = loadError instanceof Error ? loadError.message : "Unable to load profile.";
-          setError(message);
-        } finally {
-          setLoading(false);
+      setLoading(true);
+      setError(null);
+
+      try {
+        const { userId } = await params;
+        const userResponse = await fetch(`/api/users/${encodeURIComponent(userId)}`);
+
+        if (!userResponse.ok) {
+          const body = await userResponse.json().catch(() => ({}));
+          throw new Error(body?.detail ?? `Failed to load user profile (HTTP ${userResponse.status})`);
         }
-      };
-  
+
+        const userData = (await userResponse.json()) as UserProfile;
+        setUser(userData);
+        setFirstName(userData.first_name);
+        setLastName(userData.last_name);
+        setEmail(userData.email);
+      } catch (loadError) {
+        const message = loadError instanceof Error ? loadError.message : "Unable to load profile.";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     void loadProfile();
-}, [params]);
+  }, [params]);
 
   useEffect(() => {
     const loadPreferences = async () => {
       try {
-        const response = await fetch("/api/notifications/preferences", {cache: "no-store"});
+        const response = await fetch("/api/notifications/preferences", { cache: "no-store" });
         if (!response.ok) {
           throw new Error("Unable to load notification settings.");
         }
@@ -96,8 +104,15 @@ useEffect(() => {
     void loadPreferences();
   }, []);
 
+  useEffect(() => {
+    if (!passwordToast) return;
+
+    const timeout = window.setTimeout(() => setPasswordToast(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [passwordToast]);
+
   const updateNotificationPreference = async (key: keyof NotificationPreferences, enabled: boolean) => {
-    const nextPreferences = {...notificationPreferences, [key]: enabled};
+    const nextPreferences = { ...notificationPreferences, [key]: enabled };
     setNotificationPreferences(nextPreferences);
     setSavingNotifications(true);
     setNotificationSettingsError(null);
@@ -105,7 +120,7 @@ useEffect(() => {
     try {
       const response = await fetch("/api/notifications/preferences", {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nextPreferences),
       });
       if (!response.ok) {
@@ -166,51 +181,56 @@ useEffect(() => {
   };
 
   const handleSubmitPassword = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        setSaveError(null);
-        setSaveSuccess("");
+    event.preventDefault();
+    setPasswordToast(null);
+    setSaveError(null);
+    setSaveSuccess(null);
+    setPasswordValidationAttempted(true);
 
-        if (!email) {
-            setError("Missing email. Please return to the forgot password page.");
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            setError("Passwords do not match.");
-            return;
-        }
-
-        if (!isStrongPassword(password)) {
-            setError("Password does not meet all requirements.");
-            return;
-        }
-
-        try {
-            const { userId } = await params;
-            const res = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  first_name: firstName.trim(),
-                  last_name: lastName.trim(),
-                  email: email.trim(),
-                  password,
-                }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.detail ?? "Unable to reset password.");
-                return;
-            }
-
-            setError("");
-            setSaveSuccess(data.message || "Password updated successfully.");
-        } catch {
-            setError("Network error. Please try again.");
-        }
+    if (password !== confirmPassword) {
+      confirmPasswordInputRef.current?.focus();
+      return;
     }
+
+    if (!isStrongPassword(password)) {
+      passwordInputRef.current?.focus();
+      return;
+    }
+
+    if (!email) {
+      setPasswordToast({ type: "error", message: "Unable to update password: account email is missing." });
+      return;
+    }
+
+    try {
+      const { userId } = await params;
+      const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim(),
+          password,
+        }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as { detail?: string; message?: string };
+
+      if (!response.ok) {
+        setPasswordToast({ type: "error", message: data.detail ?? "Unable to update password." });
+        return;
+      }
+
+      setPassword("");
+      setConfirmPassword("");
+      setPasswordValidationAttempted(false);
+      setPasswordToast({ type: "success", message: "Password updated successfully." });
+      window.dispatchEvent(new Event("studysync:password-updated"));
+    } catch {
+      setPasswordToast({ type: "error", message: "Network error. Please try again." });
+    }
+  };
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading profile...</p>;
@@ -296,6 +316,7 @@ useEffect(() => {
                 </CardContent>
               </Card>
             </form>
+
             <Card>
               <CardHeader>
                 <CardTitle>Notifications</CardTitle>
@@ -331,64 +352,106 @@ useEffect(() => {
                 {notificationSettingsError && <p role="alert" className="text-sm text-destructive">{notificationSettingsError}</p>}
               </CardContent>
             </Card>
+
             <form onSubmit={handleSubmitPassword}>
-                <Card>
+              <Card>
                 <CardHeader>
-                    <CardTitle>Set Password</CardTitle>
-                    <CardDescription>After setting a password, you can also use email to sign in.</CardDescription>
+                  <CardTitle>Set Password</CardTitle>
+                  <CardDescription>After setting a password, you can also use email to sign in.</CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="w-full">
-                        <label htmlFor="first-name" className="block text-xs font-medium tracking-wide text-muted-foreground">
-                            Password
-                        </label>
-                        <Input
-                            type="password"
-                            id="password"
-                            className="mt-1 w-full max-w-[420px]"
-                            placeholder="New Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                        <ul className="mt-2 space-y-1 text-xs">
-                            {getPasswordRules(password).map((rule) => (
-                                <li key={rule.label} className={rule.valid ? "text-green-700" : "text-red-600"}>
-                                    {rule.valid ? "✓" : "✕"} {rule.label}
-                                </li>
-                            ))}
-                        </ul>
-                        </div>
-                        <div className="w-full">
-                        <label htmlFor="last-name" className="block text-xs font-medium tracking-wide text-muted-foreground">
-                            Confirm Password
-                        </label>
-                        <Input
-                            type="password"
-                            id="confirmPassword"
-                            className="mt-1 w-full max-w-[420px]"
-                            placeholder="Confirm Password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                        />
-                        </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="w-full">
+                      <label htmlFor="password" className="block text-xs font-medium tracking-wide text-muted-foreground">
+                        Password
+                      </label>
+                      <Input
+                        type="password"
+                        id="password"
+                        ref={passwordInputRef}
+                        autoComplete="new-password"
+                        aria-invalid={passwordTooWeak}
+                        aria-describedby={passwordTooWeak ? "password-requirements password-error" : "password-requirements"}
+                        className="mt-1 w-full max-w-[420px]"
+                        placeholder="New Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                      <ul id="password-requirements" className="mt-2 space-y-1 text-xs">
+                        {getPasswordRules(password).map((rule) => (
+                          <li key={rule.label} className={rule.valid ? "text-green-700" : "text-red-600"}>
+                            {rule.valid ? "✓" : "✕"} {rule.label}
+                          </li>
+                        ))}
+                      </ul>
+                      {passwordTooWeak && (
+                        <p id="password-error" role="alert" className="mt-2 text-xs font-medium text-destructive">
+                          Password does not meet all requirements.
+                        </p>
+                      )}
                     </div>
-                    {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
-                    {saveSuccess && <p role="status" className="text-sm text-green-700">{saveSuccess}</p>}
-                    <div className="flex justify-end mt-5">
-                        <Button type="submit" variant="secondary" size="icon-xlg" disabled={saving}>
-                        {saving ? "Saving..." : "Save"}
-                        </Button>
+                    <div className="w-full">
+                      <label htmlFor="confirmPassword" className="block text-xs font-medium tracking-wide text-muted-foreground">
+                        Confirm Password
+                      </label>
+                      <Input
+                        type="password"
+                        id="confirmPassword"
+                        ref={confirmPasswordInputRef}
+                        autoComplete="new-password"
+                        aria-invalid={passwordsMismatch}
+                        aria-describedby={passwordsMismatch ? "confirm-password-error" : undefined}
+                        className="mt-1 w-full max-w-[420px]"
+                        placeholder="Confirm Password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                      />
+                      {passwordsMismatch && (
+                        <p id="confirm-password-error" role="alert" className="mt-2 text-xs font-medium text-destructive">
+                          Passwords do not match.
+                        </p>
+                      )}
                     </div>
+                  </div>
+                  {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+                  {saveSuccess && <p role="status" className="text-sm text-green-700">{saveSuccess}</p>}
+                  <div className="flex justify-end mt-5">
+                    <Button type="submit" variant="secondary" size="icon-xlg" disabled={saving}>
+                      {saving ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
                 </CardContent>
-                </Card>
+              </Card>
             </form>
           </section>
-
         </div>
       </div>
+
+      {passwordToast && (
+        <div
+          role={passwordToast.type === "error" ? "alert" : "status"}
+          className={`notification-slide-in fixed right-4 top-20 z-[100] w-[min(420px,calc(100vw-2rem))] rounded-lg border bg-background px-4 py-3 text-foreground shadow-lg ${passwordToast.type === "error" ? "border-red-300" : "border-green-300"}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold ${passwordToast.type === "error" ? "text-destructive" : "text-green-700"}`}>
+                {passwordToast.type === "error" ? "Password Update Failed" : "Password Updated"}
+              </p>
+              <p className="mt-1 text-sm">{passwordToast.message}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPasswordToast(null)}
+              aria-label="Dismiss password notification"
+              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-secondary"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
