@@ -80,3 +80,73 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+  migrations:
+    name: PostgreSQL migrations
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      APP_ENV: staging
+      DATABASE_URL: postgresql+psycopg://postgres:ci-test-password@127.0.0.1:5432/postgres
+      UWM_CATALOG_SYNC_ON_STARTUP: "false"
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Restore baseline schema
+        run: |
+          docker exec "${{ job.services.postgres.id }}" \
+            psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            -c 'DROP SCHEMA public CASCADE;'
+
+          docker exec -i "${{ job.services.postgres.id }}" \
+            psql -X -v ON_ERROR_STOP=1 --single-transaction \
+            -U postgres -d postgres \
+            < tests/fixtures/studysync_baseline_b4a1f7c92d60.sql
+
+      - name: Verify restored baseline
+        run: |
+          tables="$(docker exec "${{ job.services.postgres.id }}" \
+            psql -U postgres -d postgres -Atc \
+            "SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema = 'public' AND table_type = 'BASE TABLE';")"
+
+          test "$tables" = "24" || {
+            echo "Expected 24 application tables; found $tables"
+            exit 1
+          }
+
+      - name: Apply and validate migrations
+        run: |
+          uv run --no-sync alembic stamp b4a1f7c92d60
+          uv run --no-sync alembic upgrade head
+          uv run --no-sync alembic current --check-heads
+          uv run --no-sync alembic check
