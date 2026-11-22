@@ -46,11 +46,8 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def init_db() -> None:
-    """Initializes the database by creating tables and seeding initial data."""
-    from src.db.models import Course, ProfessorReview # Import Course model here for seeding
-
-    # 1. Create all tables if they do not exist
+def _initialize_development_schema() -> None:
+    """Initialize and evolve the schema for local development."""
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
 
@@ -160,6 +157,13 @@ def init_db() -> None:
                     "ALTER TABLE notification_preferences "
                     "ADD COLUMN saved_course_posts BOOLEAN NOT NULL DEFAULT TRUE"
                 ))
+
+
+def init_db() -> None:
+    """Initialize application data and synchronize the course catalog."""
+    from src.db.models import Course, ProfessorReview
+
+    if settings.app_env == "development": _initialize_development_schema()
 
     # 2. Seed initial data for the Course table
     SessionLocal = get_session_factory()
