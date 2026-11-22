@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+REPO="/opt/studysync/StudySync"
+STATE_FILE="/var/lib/studysync/last-successful-commit"
+FAILED_FILE="/var/lib/studysync/last-failed-commit"
+BACKUP_DIR="/var/backups/studysync"
+
+exec 9>/run/lock/studysync-deploy.lock
+flock -n 9 || { echo "Deployment already running." >&2; exit 1; }
+
+cd "$REPO"
+[[ "$(git branch --show-current)" == "main" ]] || { echo "Deployment aborted: not on main." >&2; exit 1; }
+[[ -z "$(git status --porcelain)" ]] || { echo "Deployment aborted: working tree not clean." >&2; exit 1; }
+[[ -s "$STATE_FILE" ]] || { echo "Deployment aborted: missing successful-commit marker." >&2; exit 1; }
+[[ ! -e "$FAILED_FILE" ]] || { echo "Deployment blocked: inspect $FAILED_FILE before retrying." >&2; exit 1; }
+
+git fetch --quiet origin main
+current="$(git rev-parse HEAD)"
+target="$(git rev-parse refs/remotes/origin/main)"
+deployed="$(cat "$STATE_FILE")"
+[[ "$deployed" =~ ^[0-9a-f]{40}$ ]] || { echo "Deployment aborted: invalid commit marker." >&2; exit 1; }
+
+if [[ "$deployed" == "$target" ]]; then
+  [[ "$current" == "$target" ]] || { echo "Deployment aborted: repository and marker disagree." >&2; exit 1; }
+  echo "No new deployment required: $target"
+  exit 0
+fi
+
+git merge-base --is-ancestor "$deployed" "$target" || { echo "Deployment aborted: deployed history diverged." >&2; exit 1; }
+git merge-base --is-ancestor "$current" "$target" || { echo "Deployment aborted: main cannot fast-forward." >&2; exit 1; }
+
+compose=(docker compose --env-file /etc/studysync/.env -f compose.prod.yml)
+"${compose[@]}" exec -T backend alembic current --check-heads
+
+mkdir -p "$BACKUP_DIR"
+backup="$BACKUP_DIR/postgres-$(date -u +%Y%m%dT%H%M%SZ)-${target:0:12}.dump"
+backup_tmp="$(mktemp "$BACKUP_DIR/.postgres.XXXXXX")"
+trap 'rm -f "${backup_tmp:-}"' EXIT
+
+docker exec studysync-postgres pg_dump -U studysync -d studysync -Fc > "$backup_tmp"
+docker exec -i studysync-postgres pg_restore --list < "$backup_tmp" > /dev/null
+mv -- "$backup_tmp" "$backup"
+echo "Verified database backup: $backup"
+
+# Block unattended retries if deployment is interrupted or fails.
+printf '%s\n' "$target" > "$FAILED_FILE"
+trap 'echo "Deployment failed; inspect $FAILED_FILE and $backup before retrying." >&2' ERR
+
+# Retain images of the previously deployed release for manual recovery.
+docker image tag "$(docker inspect -f '{{.Image}}' studysync-backend)" "studysync-backend:release-${deployed:0:12}"
+docker image tag "$(docker inspect -f '{{.Image}}' studysync-frontend)" "studysync-frontend:release-${deployed:0:12}"
+
+if [[ "$current" != "$target" ]]; then git merge --ff-only "$target"; fi
+"${compose[@]}" config --quiet
+"${compose[@]}" build backend frontend
+"${compose[@]}" run --rm --no-deps backend alembic upgrade head
+"${compose[@]}" run --rm --no-deps backend alembic current --check-heads
+"${compose[@]}" run --rm --no-deps backend alembic check
+"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 120 backend worker frontend
+
+check_http() {
+  local url="$1"
+  for attempt in {1..60}; do
+    if curl -fsS --max-time 5 --output /dev/null "$url" 2>/dev/null; then
+      echo "HTTP verification passed: $url"
+      return 0
+    fi
+    echo "Waiting for HTTP readiness ($attempt/60): $url"
+    sleep 2
+  done
+  echo "HTTP verification failed: $url" >&2
+  return 1
+}
+
+check_http "http://127.0.0.1:8000/"
+check_http "http://127.0.0.1:3000/api/courses/subjects"
+[[ "$(docker inspect -f '{{.State.Running}}' studysync-worker)" == "true" ]]
+[[ "$(docker inspect -f '{{.Image}}' studysync-worker)" == "$(docker inspect -f '{{.Image}}' studysync-backend)" ]]
+
+marker_tmp="$(mktemp /var/lib/studysync/.last-successful-commit.XXXXXX)"
+printf '%s\n' "$target" > "$marker_tmp"
+mv -- "$marker_tmp" "$STATE_FILE"
+rm -f "$FAILED_FILE"
+echo "StudySync deployment successful: $target"
