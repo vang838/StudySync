@@ -154,6 +154,7 @@ class DocumentDeleteResponse(BaseModel):
 
 
 class ChatCreateRequest(BaseModel):
+    conversation_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     course_id: str | None = None
     question: str = Field(min_length=1)
     hint_level: Literal[1, 2, 3, 4] | None = None
@@ -167,6 +168,7 @@ class ChatMessage(BaseModel):
 
 class ChatThread(BaseModel):
     chat_id: str
+    conversation_id: str
     course_id: str | None
     question: str
     answer: str
@@ -178,10 +180,12 @@ class ChatThread(BaseModel):
     citations: list[Citation]
     claims: list[GeneratedClaim]
 
+
 class CardInput(BaseModel):
     flashcard_id: int | None = Field(default=None, gt=0)
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
 
 class SetInput(BaseModel):
     course_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -189,11 +193,13 @@ class SetInput(BaseModel):
     description: str | None = None
     cards: list[CardInput] = Field(min_length=1)
 
+
 class CardOut(CardInput):
     model_config = ConfigDict(from_attributes=True)
 
     flashcard_id: int
     position: int
+
 
 class SetOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -205,6 +211,7 @@ class SetOut(BaseModel):
     description: str | None
     created_at: datetime
     cards: list[CardOut]
+
 
 class RatingInput(BaseModel):
     rating: Literal["easy", "practice", "hard"]
@@ -235,9 +242,7 @@ class StudyTaskData(BaseModel):
     depends_on: list[str] = Field(default_factory=list, max_length=100, alias="dependsOn")
     recurrence: Literal["none", "weekly"] = "none"
     last_pomodoro_session_id: str | None = Field(
-        default=None,
-        alias="lastPomodoroSessionId",
-        max_length=64,
+        default=None, alias="lastPomodoroSessionId", max_length=64,
     )
     updated_at: datetime = Field(alias="updatedAt")
 
@@ -268,6 +273,7 @@ class StudyPlannerSettingsUpdate(BaseModel):
 
 class ChatCreateResponse(ChatThread):
     pass
+
 
 class DocumentIngestionStatusResponse(BaseModel):
     document_id: str

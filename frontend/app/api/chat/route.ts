@@ -8,11 +8,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await request.json();
+    const sessionToken = request.cookies.get('studysync_session')?.value;
+
     const response = await fetch(targetUrl.toString(), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         accept: 'application/json',
+        ...(sessionToken ? { cookie: `studysync_session=${sessionToken}` } : {}),
       },
       signal: controller.signal,
       body: JSON.stringify(payload),

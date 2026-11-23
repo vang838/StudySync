@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -9,6 +10,8 @@ import {
 } from "react";
 
 import { useParams, usePathname } from "next/navigation";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Cancel01Icon, Clock01Icon, NoteEditIcon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 
 const MIN_WIDTH = 320;
@@ -61,11 +64,34 @@ type ChatMessage = {
 };
 
 type ChatResponse = {
+  chat_id: string;
+  conversation_id: string;
   answer: string;
   mode: "general" | "course";
   evidence_status: "not_applicable" | "sufficient" | "conflicting" | "insufficient";
   citations: Citation[];
   claims: GeneratedClaim[];
+};
+
+type ChatConversationSummary = {
+  conversation_id: string;
+  course_id: string | null;
+  title: string;
+  updated_at: string;
+};
+
+type ChatConversationListResponse = {
+  items: ChatConversationSummary[];
+  has_more: boolean;
+};
+
+type ChatConversationDetail = {
+  conversation_id: string;
+  course_id: string | null;
+  turns: Array<ChatResponse & {
+    question: string;
+    messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  }>;
 };
 
 type SavedCourse = {
@@ -183,13 +209,40 @@ export default function AssistantWidget() {
   const [selectedCourseId, setSelectedCourseId] = useState<string>(
     courseId ?? ""
   );
+
+  const conversationIdRef = useRef<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const requestVersionRef = useRef(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [histories, setHistories] = useState<ChatConversationSummary[]>([]);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const historyRequestVersionRef = useRef(0);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
   useEffect(() => {
-    // Route navigation is external state and must reset a prior manual selection.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // A route-selected course starts a separate conversation.
+    conversationIdRef.current = null;
+    requestVersionRef.current += 1;
+    historyRequestVersionRef.current += 1;
+
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setActiveConversationId(null);
     setSelectedCourseId(courseId ?? "");
+    setMessages([]);
+    setInput("");
+    setLoading(false);
+    setHintLevel(1);
+    setActiveQuestion("");
+    setActiveCourseId("");
+    setError(null);
+    setHistoryOpen(false);
+    setHistoryLoading(false);
+    setRestoring(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [courseId]);
 
   useEffect(() => {
@@ -235,7 +288,6 @@ export default function AssistantWidget() {
     return () => controller.abort();
   }, [open]);
 
-
   useEffect(() => {
     const assistantWidth = open
       ? `min(${width}px, 66.6667vw)`
@@ -253,6 +305,121 @@ export default function AssistantWidget() {
 
   if (pathname.startsWith("/auth")) {
     return null;
+  }
+
+  function resetConversation() {
+    requestVersionRef.current += 1;
+    historyRequestVersionRef.current += 1;
+    setHistoryOpen(false);
+    setHistoryLoading(false);
+    setHistoryError(null);
+    conversationIdRef.current = null;
+    setActiveConversationId(null);
+    setMessages([]);
+    setInput("");
+    setLoading(false);
+    setHintLevel(1);
+    setActiveQuestion("");
+    setActiveCourseId("");
+    setError(null);
+  }
+
+  async function loadHistoryPage(offset: number, append = false) {
+    const requestVersion = ++historyRequestVersionRef.current;
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    try {
+      const response = await fetch(`/api/chat/conversations?limit=20&offset=${offset}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`Unable to load history (${response.status}).`);
+
+      const data: ChatConversationListResponse = await response.json();
+      if (historyRequestVersionRef.current !== requestVersion) return;
+      setHistories((current) => append ? [...current, ...data.items] : data.items);
+      setHistoryHasMore(data.has_more);
+    } catch (error) {
+      if (historyRequestVersionRef.current !== requestVersion) return;
+      console.error("Unable to load chat history.", error);
+      setHistoryError("Unable to load conversations. Please try again.");
+    } finally {
+      if (historyRequestVersionRef.current === requestVersion) setHistoryLoading(false);
+    }
+  }
+
+  function toggleHistory() {
+    if (loading || restoring) return;
+    if (historyOpen) {
+      historyRequestVersionRef.current += 1;
+      setHistoryLoading(false);
+      setHistoryOpen(false);
+      return;
+    }
+
+    setHistoryOpen(true);
+    void loadHistoryPage(0);
+  }
+
+  async function restoreConversation(item: ChatConversationSummary) {
+    if (loading || restoring || historyLoading) return;
+    const requestVersion = ++requestVersionRef.current;
+    historyRequestVersionRef.current += 1;
+    setRestoring(true);
+    setHistoryError(null);
+
+    try {
+      const response = await fetch(`/api/chat/conversations/${encodeURIComponent(item.conversation_id)}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`Unable to load conversation (${response.status}).`);
+
+      const data: ChatConversationDetail = await response.json();
+      if (requestVersionRef.current !== requestVersion) return;
+      if (data.conversation_id !== item.conversation_id || !Array.isArray(data.turns)) {
+        throw new Error("Invalid conversation response.");
+      }
+
+      const restoredMessages: ChatMessage[] = data.turns.flatMap((turn) =>
+        turn.messages.flatMap((message, index): ChatMessage[] => {
+          if (message.role !== "user" && message.role !== "assistant") return [];
+          return [{
+            id: `${turn.chat_id}-${index}`,
+            role: message.role,
+            content: message.content,
+            ...(message.role === "assistant" ? {
+              mode: turn.mode,
+              evidenceStatus: turn.evidence_status,
+              citations: turn.citations,
+              claims: turn.claims,
+            } : {}),
+          }];
+        })
+      );
+
+      conversationIdRef.current = data.conversation_id;
+      setActiveConversationId(data.conversation_id);
+      setSelectedCourseId(data.course_id ?? "");
+      setMessages(restoredMessages);
+      setInput("");
+      setHintLevel(1);
+      setActiveQuestion("");
+      setActiveCourseId("");
+      setError(null);
+      setHistoryOpen(false);
+    } catch (error) {
+      if (requestVersionRef.current !== requestVersion) return;
+      console.error("Unable to restore conversation.", error);
+      setHistoryError("Unable to open that conversation. Please try again.");
+    } finally {
+      if (requestVersionRef.current === requestVersion) setRestoring(false);
+    }
+  }
+
+  function handleCourseChange(nextCourseId: string) {
+    if (nextCourseId === selectedCourseId) return;
+    resetConversation();
+    setSelectedCourseId(nextCourseId);
   }
 
   function handleResizeStart(event: PointerEvent<HTMLDivElement>) {
@@ -287,21 +454,21 @@ export default function AssistantWidget() {
     event.preventDefault();
 
     const question = input.trim();
+    if (!question || loading) return;
 
-    if (!question || loading) {
-      return;
-    }
+    const requestVersion = requestVersionRef.current;
+    const questionMessageId = crypto.randomUUID();
+    const selectedCourse = selectedCourseId;
 
     setError(null);
     setLoading(true);
-
     setHintLevel(1);
-    setActiveCourseId(selectedCourseId);
+    setActiveQuestion("");
 
     setMessages((current) => [
       ...current,
       {
-        id: crypto.randomUUID(),
+        id: questionMessageId,
         role: "user",
         content: question,
       },
@@ -317,17 +484,23 @@ export default function AssistantWidget() {
         },
         body: JSON.stringify({
           question,
-          hint_level: 1,
-          ...(selectedCourseId ? { course_id: selectedCourseId } : {}),
+          ...(conversationIdRef.current ? { conversation_id: conversationIdRef.current } : {}),
+          ...(selectedCourse ? { course_id: selectedCourse, hint_level: 1 } : {}),
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Assistant request failed");
+        throw new Error(`Assistant request failed (${response.status}).`);
       }
 
       const data: ChatResponse = await response.json();
+      if (requestVersionRef.current !== requestVersion) return;
+      if (!data.conversation_id) throw new Error("Missing conversation ID.");
+
+      conversationIdRef.current = data.conversation_id;
+      setActiveConversationId(data.conversation_id);
       setActiveQuestion(question);
+      setActiveCourseId(selectedCourse);
 
       setMessages((current) => [
         ...current,
@@ -342,18 +515,27 @@ export default function AssistantWidget() {
         },
       ]);
     } catch (error) {
+      if (requestVersionRef.current !== requestVersion) return;
+
       console.error("Unable to generate assistant response.", error);
+      setMessages((current) => current.filter((message) => message.id !== questionMessageId));
+      setInput(question);
       setError("Failed to get a response. Please try again.");
     } finally {
-      setLoading(false);
+      if (requestVersionRef.current === requestVersion) {
+        setLoading(false);
+      }
     }
   }
 
   async function handleNextHint() {
-    if (loading || !activeQuestion || hintLevel >= 4) {
+    const conversationId = conversationIdRef.current;
+
+    if (loading || !activeQuestion || !activeCourseId || !conversationId || hintLevel >= 4) {
       return;
     }
 
+    const requestVersion = requestVersionRef.current;
     const nextLevel = hintLevel + 1;
 
     setError(null);
@@ -367,16 +549,19 @@ export default function AssistantWidget() {
         },
         body: JSON.stringify({
           question: activeQuestion,
+          conversation_id: conversationId,
           hint_level: nextLevel,
-          ...(activeCourseId ? { course_id: activeCourseId } : {}),
+          course_id: activeCourseId,
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Assistant request failed");
+        throw new Error(`Assistant request failed (${response.status}).`);
       }
 
       const data: ChatResponse = await response.json();
+      if (requestVersionRef.current !== requestVersion) return;
+      if (data.conversation_id !== conversationId) throw new Error("Conversation ID mismatch.");
 
       setMessages((current) => [
         ...current,
@@ -393,10 +578,14 @@ export default function AssistantWidget() {
 
       setHintLevel(nextLevel);
     } catch (error) {
+      if (requestVersionRef.current !== requestVersion) return;
+
       console.error("Unable to generate next hint.", error);
       setError("Failed to get the next hint. Please try again.");
     } finally {
-      setLoading(false);
+      if (requestVersionRef.current === requestVersion) {
+        setLoading(false);
+      }
     }
   }
 
@@ -414,7 +603,7 @@ export default function AssistantWidget() {
 
       {open && (
         <aside
-          className={`fixed right-0 top-0 z-50 flex h-screen flex-col border-l bg-background shadow-xl ${resizing ? "select-none" : ""
+          className={`@container fixed right-0 top-0 z-50 flex h-screen flex-col border-l bg-background shadow-xl ${resizing ? "select-none" : ""
             }`}
           style={{
             width: `${width}px`,
@@ -432,40 +621,126 @@ export default function AssistantWidget() {
             className="absolute left-0 top-0 z-10 h-full w-2 -translate-x-1 cursor-ew-resize touch-none hover:bg-border/70"
           />
 
-          <div className="flex items-start justify-between border-b p-4">
-            <div>
-              <h2 className="font-semibold">StudySync AI</h2>
-              <select
-                aria-label="Select course context"
-                value={selectedCourseId}
-                onChange={(event) => setSelectedCourseId(event.target.value)}
-                disabled={loading}
-                className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-              >
-                <option value="">General</option>
-                {courseId && !savedCourses.some((course) => course.course_id === courseId) && (
-                  <option value={courseId}>{courseId}</option>
-                )}
-                {savedCourses.map((course) => (
-                  <option key={course.course_id} value={course.course_id}>
-                    {course.title}
-                  </option>
-                ))}
-              </select>
+          <div className="border-b p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="min-w-0 truncate font-semibold">StudySync AI</h2>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant={historyOpen ? "secondary" : "ghost"}
+                  size="icon"
+                  aria-label={historyOpen ? "Back to chat" : "Show chat history"}
+                  title={historyOpen ? "Back to chat" : "Chat history"}
+                  aria-pressed={historyOpen}
+                  onClick={toggleHistory}
+                  disabled={loading || restoring}
+                >
+                  <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="New Chat"
+                  title="New Chat"
+                  onClick={resetConversation}
+                  disabled={loading || restoring}
+                  className="@min-[440px]:w-auto @min-[440px]:px-3"
+                >
+                  <HugeiconsIcon icon={NoteEditIcon} strokeWidth={2} aria-hidden="true" />
+                  <span className="hidden @min-[440px]:inline">New Chat</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Close assistant"
+                  title="Close assistant"
+                  onClick={() => setOpen(false)}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden="true" />
+                </Button>
+              </div>
             </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="s"
-              onClick={() => setOpen(false)}
+            <select
+              aria-label="Select course context"
+              title="Changing courses starts a new chat"
+              value={selectedCourseId}
+              onChange={(event) => handleCourseChange(event.target.value)}
+              disabled={loading || restoring}
+              className="mt-3 w-full min-w-0 rounded-md border border-input bg-background px-2 py-1 text-sm"
             >
-              Close
-            </Button>
+              <option value="">General</option>
+              {courseId && !savedCourses.some((course) => course.course_id === courseId) && (
+                <option value={courseId}>{courseId}</option>
+              )}
+              {selectedCourseId && selectedCourseId !== courseId && !savedCourses.some(
+                (course) => course.course_id === selectedCourseId
+              ) && <option value={selectedCourseId}>{selectedCourseId}</option>}
+              {savedCourses.map((course) => (
+                <option key={course.course_id} value={course.course_id}>
+                  {course.title}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-            {messages.length === 0 ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+            {historyOpen ? (
+              <section aria-label="Conversation history" className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold">Recent conversations</h3>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Refresh chat history"
+                    aria-label="Refresh chat history"
+                    disabled={historyLoading || restoring}
+                    onClick={() => void loadHistoryPage(0)}
+                  >
+                    <HugeiconsIcon icon={Clock01Icon} aria-hidden="true" />
+                  </Button>
+                </div>
+
+                {historyError && <p role="alert" className="text-sm text-destructive">{historyError}</p>}
+                {historyLoading && histories.length === 0 && (
+                  <p role="status" className="text-sm text-muted-foreground">Loading conversations...</p>
+                )}
+                {!historyLoading && histories.length === 0 && !historyError && (
+                  <p className="text-sm text-muted-foreground">No saved conversations yet.</p>
+                )}
+
+                {histories.map((item) => (
+                  <button
+                    key={item.conversation_id}
+                    type="button"
+                    onClick={() => void restoreConversation(item)}
+                    disabled={historyLoading || restoring}
+                    aria-current={activeConversationId === item.conversation_id ? "true" : undefined}
+                    className="w-full min-w-0 rounded-lg border border-input p-3 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50 aria-[current=true]:border-secondary"
+                  >
+                    <span className="block truncate text-sm font-medium">{item.title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {item.course_id ?? "General"} · {new Date(item.updated_at).toLocaleDateString()}
+                    </span>
+                  </button>
+                ))}
+
+                {historyHasMore && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={historyLoading || restoring}
+                    onClick={() => void loadHistoryPage(histories.length, true)}
+                  >
+                    {historyLoading ? "Loading..." : "Load older conversations"}
+                  </Button>
+                )}
+                {restoring && <p role="status" className="text-sm text-muted-foreground">Opening conversation...</p>}
+              </section>
+            ) : messages.length === 0 ? (
               <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
                 Ask questions about your studies, coursework, or anything else you need help with.
               </div>
@@ -493,7 +768,7 @@ export default function AssistantWidget() {
               ))
             )}
 
-            {loading && (
+            {!historyOpen && loading && (
               <div
                 role="status"
                 className="mr-auto max-w-[85%] rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"
@@ -502,7 +777,7 @@ export default function AssistantWidget() {
               </div>
             )}
 
-            {error && (
+            {!historyOpen && error && (
               <div
                 role="alert"
                 className="mr-auto max-w-[85%] rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -512,8 +787,8 @@ export default function AssistantWidget() {
             )}
           </div>
 
-          <div className="border-t p-4">
-            {activeQuestion && hintLevel < 4 && !loading && (
+          {!historyOpen && <div className="border-t p-4">
+            {activeQuestion && activeCourseId && hintLevel < 4 && !loading && (
               <Button
                 type="button"
                 variant="outline"
@@ -530,14 +805,15 @@ export default function AssistantWidget() {
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder="Ask a question..."
+                aria-label="Ask the AI assistant"
                 className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none"
               />
 
-              <Button type="submit" disabled={!input.trim() || loading}>
+              <Button type="submit" disabled={!input.trim() || loading} className="w-auto shrink-0 px-4">
                 {loading ? "Thinking..." : "Send"}
               </Button>
             </form>
-          </div>
+          </div>}
         </aside>
       )}
     </>
