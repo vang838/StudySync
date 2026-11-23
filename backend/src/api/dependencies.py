@@ -48,7 +48,9 @@ from src.ports.vector_store import VectorStorePort
 from src.application.assistant_service import AssistantService
 from src.ports.llm import LLMPort
 
+from src.adapters.repositories.sqlalchemy_conversation_history import SQLAlchemyConversationHistoryAdapter
 from src.adapters.repositories.sqlalchemy_course import SQLAlchemyCourseRepositoryAdapter
+from src.ports.conversation_history import ConversationHistoryPort
 from src.ports.course_repository import CourseRepositoryPort
 
 import httpx
@@ -57,6 +59,11 @@ from src.adapters.external_retrieval.searxng import SearXNGExternalRetrievalAdap
 
 def get_course_repository(db: Session = Depends(get_db)) -> CourseRepositoryPort:
     return SQLAlchemyCourseRepositoryAdapter(db)
+
+
+def get_conversation_history_repository(db: Session = Depends(get_db)) -> ConversationHistoryPort:
+    return SQLAlchemyConversationHistoryAdapter(db)
+
 
 def get_current_user(
     studysync_session: str | None = Cookie(default=None),
@@ -153,7 +160,6 @@ def get_document_ingestion_service(db: Session = Depends(get_db), storage: Objec
 def get_document_parser_registry() -> DocumentParserRegistry:
     return DocumentParserRegistry()
 
-
 def get_document_extraction_service(db: Session = Depends(get_db), storage: ObjectStoragePort = Depends(get_object_storage), parser_registry: DocumentParserRegistry = Depends(get_document_parser_registry),) -> DocumentExtractionService:
     return DocumentExtractionService(db=db, storage=storage, parser_registry=parser_registry)
 
@@ -165,7 +171,6 @@ def get_document_normalization_service(db: Session = Depends(get_db), extraction
 
 def get_document_chunker() -> DocumentChunker:
     return DocumentChunker(max_words=settings.document_chunk_max_words, overlap_words=settings.document_chunk_overlap_words,)
-
 
 def get_document_chunking_service(db: Session = Depends(get_db), normalization_service: DocumentNormalizationService = Depends(get_document_normalization_service), chunker: DocumentChunker = Depends(get_document_chunker),) -> DocumentChunkingService:
     return DocumentChunkingService(db=db, normalization_service=normalization_service, chunker=chunker)
@@ -241,7 +246,7 @@ def get_evidence_ranking_service() -> EvidenceRankingService:
 
 def get_evidence_retrieval_service(document_retrieval: DocumentRetrievalService = Depends(get_document_retrieval_service),external_retrieval: ExternalRetrievalPort = Depends(get_external_retrieval_port),evidence_service: EvidenceService = Depends(get_evidence_service),ranking_service: EvidenceRankingService = Depends(get_evidence_ranking_service)) -> EvidenceRetrievalService:
     return EvidenceRetrievalService(document_retrieval=document_retrieval, external_retrieval=external_retrieval, evidence_service=evidence_service, ranking_service=ranking_service)
-    
+
 def get_rag_service(retrieval_service: EvidenceRetrievalService = Depends(get_evidence_retrieval_service), llm: LLMPort = Depends(get_llm_port)) -> RAGService:
     return RAGService(retrieval_service=retrieval_service, llm=llm)
 

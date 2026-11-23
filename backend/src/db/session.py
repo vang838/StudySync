@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.application.uwm_catalog_sync_service import sync_uwm_catalog_courses
 from src.core.config import settings
 from src.db.base import Base
+from src.db import chat_conversation_models  # noqa: F401
 from src.db.chat_evidence_models import ChatEvidenceAssessmentRecord  # noqa: F401
 from src.db.models import ChatMessageRecord, ChatThreadRecord
 
@@ -223,7 +224,7 @@ def init_db() -> None:
                     course_id="cs101",
                     user_id=None,
                     rating=5,
-                    feedback="Explains concepts clearly and is very helpful during class.",
+                    feedback="Explains concepts clearly and is very helpful in class.",
                 ),
                 ProfessorReview(
                     professor="Dr. Evelyn Reed, Ph.D.",
@@ -254,7 +255,7 @@ def init_db() -> None:
                     max_subjects=settings.uwm_catalog_max_subjects,
                 )
                 print(
-                    "UWM catalog sync complete: "
+                    f"UWM catalog sync complete: "
                     f"subjects={result.subject_count}, "
                     f"courses_found={result.course_count_found}, "
                     f"inserted={result.inserted_count}, "
